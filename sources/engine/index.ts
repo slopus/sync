@@ -15,12 +15,14 @@ export {
     type,
     mutable as mutableField,
     immutable as immutableField,
+    local as localField,
     reference,
 } from './schema';
 export type {
     FieldType,
     MutableFieldDescriptor,
     ImmutableFieldDescriptor,
+    LocalFieldDescriptor,
     ReferenceFieldDescriptor,
     FieldDescriptor,
     CollectionSchema,

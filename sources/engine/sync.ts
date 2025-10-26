@@ -15,8 +15,13 @@ export type SyncState<T extends FullSchemaDefinition> = {
  *
  * This represents a mutation that is:
  * - Applied to the local state (optimistic update)
- * - Waiting for server confirmation
+ * - Waiting for server confirmation (unless it's a local mutation)
  * - Will be rebased if server state changes
+ *
+ * Local mutations (isLocal: true):
+ * - Applied locally but NOT sent to server
+ * - Useful for UI-only state changes
+ * - Filtered out from pendingMutations (use allMutations to see them)
  *
  * This is a discriminated union where the `input` type is strictly typed
  * based on the `name` field, enabling type-safe access to mutation data.
@@ -33,9 +38,10 @@ export type SyncState<T extends FullSchemaDefinition> = {
  *
  * const engine = sync(schema);
  * engine.mutate('createTodo', { id: '1', title: 'Test' });
+ * engine.mutateLocal('deleteTodo', { id: '1' }); // Local-only
  *
  * // Type narrowing based on mutation name
- * for (const mutation of engine.pendingMutations) {
+ * for (const mutation of engine.allMutations) {
  *   if (mutation.name === 'createTodo') {
  *     // TypeScript knows: mutation.input is { id: string; title: string }
  *     console.log(mutation.input.title); // ✓ Type-safe
@@ -56,6 +62,12 @@ export type PendingMutation<T extends FullSchemaDefinition> = {
         readonly name: M;
         /** Input data for the mutation, strictly typed based on mutation name */
         readonly input: InferMutationInput<Schema<T>, M>;
+        /**
+         * Whether this is a local-only mutation
+         * - true: mutation is NOT sent to server, filtered from pendingMutations
+         * - false: mutation will be sent to server
+         */
+        readonly isLocal: boolean;
     }
 }[InferMutations<Schema<T>>];
 
@@ -98,15 +110,35 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
     /**
      * List of pending mutations waiting for server confirmation
      * These mutations have been applied to local state but not yet confirmed
+     * Excludes local mutations (use allMutations to see all mutations)
      * Read-only array to prevent external modification
      */
     readonly pendingMutations: ReadonlyArray<PendingMutation<T>>;
 
     /**
+     * List of ALL mutations including local and pending mutations
+     * Maintains insertion order
+     * Read-only array to prevent external modification
+     */
+    readonly allMutations: ReadonlyArray<PendingMutation<T>>;
+
+    /**
      * Apply a mutation locally
      * Creates a mutation ID and timestamp, adds to pending list, and rebases state
+     * This mutation will be sent to the server
      */
     mutate<M extends InferMutations<Schema<T>>>(
+        name: M,
+        input: InferMutationInput<Schema<T>, M>
+    ): void;
+
+    /**
+     * Apply a local-only mutation
+     * Creates a mutation ID and timestamp, adds to mutations list, and rebases state
+     * This mutation is NOT sent to the server (filtered from pendingMutations)
+     * Useful for UI-only state changes
+     */
+    mutateLocal<M extends InferMutations<Schema<T>>>(
         name: M,
         input: InferMutationInput<Schema<T>, M>
     ): void;
@@ -158,14 +190,15 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
     // Internal state
     let serverState: SyncState<T> = createEmptyState();
     let state: SyncState<T> = createEmptyState();
-    const pendingMutations: PendingMutation<T>[] = [];
+    // All mutations (both pending and local) in order
+    const allPendingMutations: PendingMutation<T>[] = [];
     const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;
 
     /**
-     * Rebase state by applying all pending mutations to server state
+     * Rebase state by applying ALL mutations (including local) to server state
      */
     const rebaseState = (): void => {
-        state = pendingMutations.reduce(
+        state = allPendingMutations.reduce(
             (currentState, mutation) => {
                 const mutator = mutators[mutation.name];
                 if (!mutator) {
@@ -190,8 +223,13 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
         },
 
         get pendingMutations() {
-            // Return readonly copy to prevent external modification
-            return pendingMutations as ReadonlyArray<PendingMutation<T>>;
+            // Filter out local mutations and return readonly copy
+            return allPendingMutations.filter(m => !m.isLocal) as ReadonlyArray<PendingMutation<T>>;
+        },
+
+        get allMutations() {
+            // Return all mutations including local
+            return allPendingMutations as ReadonlyArray<PendingMutation<T>>;
         },
 
         mutate(name, input) {
@@ -201,10 +239,28 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
                 timestamp: Date.now(),
                 name: name as InferMutations<Schema<T>>,
                 input,
+                isLocal: false,
             };
 
-            // Add to pending mutations
-            pendingMutations.push(mutation);
+            // Add to mutations list
+            allPendingMutations.push(mutation);
+
+            // Rebase state
+            rebaseState();
+        },
+
+        mutateLocal(name, input) {
+            // Create local mutation metadata
+            const mutation: PendingMutation<T> = {
+                id: createId(),
+                timestamp: Date.now(),
+                name: name as InferMutations<Schema<T>>,
+                input,
+                isLocal: true,
+            };
+
+            // Add to mutations list (same array to maintain order)
+            allPendingMutations.push(mutation);
 
             // Rebase state
             rebaseState();
@@ -222,22 +278,23 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
             const idsSet = new Set(idsToCommit);
 
             // Filter out committed mutations
-            const originalLength = pendingMutations.length;
-            let i = pendingMutations.length;
+            const originalLength = allPendingMutations.length;
+            let i = allPendingMutations.length;
             while (i--) {
-                if (idsSet.has(pendingMutations[i].id)) {
-                    pendingMutations.splice(i, 1);
+                if (idsSet.has(allPendingMutations[i].id)) {
+                    allPendingMutations.splice(i, 1);
                 }
             }
 
             // Only rebase if we actually removed something
-            if (pendingMutations.length !== originalLength) {
+            if (allPendingMutations.length !== originalLength) {
                 rebaseState();
             }
         },
 
         rebase(partialServerUpdate) {
             // Helper to check if an item has all required fields defined
+            // Local fields are NOT required from server (they use defaults)
             const isComplete = (item: Record<string, unknown>, collectionName: string): boolean => {
                 const collectionFields = schema.collection(collectionName as keyof T['types']);
                 if (!collectionFields) return false;
@@ -247,14 +304,32 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
                     return false;
                 }
 
-                // Check all schema-defined fields
+                // Check all schema-defined fields (except local fields)
                 for (const fieldName in collectionFields) {
+                    const field = collectionFields[fieldName];
+                    // Skip local fields - they use default values
+                    if (field.fieldType === 'local') continue;
+
                     if (item[fieldName] === undefined) {
                         return false;
                     }
                 }
 
                 return true;
+            };
+
+            // Helper to initialize local fields with default values
+            const initializeLocalFields = (item: Record<string, unknown>, collectionName: string): void => {
+                const collectionFields = schema.collection(collectionName as keyof T['types']);
+                if (!collectionFields) return;
+
+                for (const fieldName in collectionFields) {
+                    const field = collectionFields[fieldName];
+                    if (field.fieldType === 'local') {
+                        // Initialize local field with default value
+                        item[fieldName] = field.defaultValue;
+                    }
+                }
             };
 
             // Merge partial server update into current server state
@@ -267,18 +342,27 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
                     if (!partialItems) continue;
 
                     const collection = draftState[collectionKey];
+                    const collectionFields = schema.collection(collectionKey);
 
                     for (const partialItem of partialItems) {
                         const itemId = partialItem.id;
                         const existingItem = collection[itemId];
 
                         if (existingItem) {
-                            // Item exists: patch/merge fields
-                            Object.assign(existingItem, partialItem);
+                            // Item exists: patch/merge fields (but SKIP local fields)
+                            for (const key in partialItem) {
+                                const field = collectionFields?.[key];
+                                // Skip local fields - they're client-side only
+                                if (field?.fieldType === 'local') continue;
+                                // Update all other fields
+                                (existingItem as Record<string, unknown>)[key] = (partialItem as Record<string, unknown>)[key];
+                            }
                         } else {
                             // Item doesn't exist: only create if complete
                             if (isComplete(partialItem as Record<string, unknown>, collectionName)) {
-                                // Use type assertion to bypass complex type inference
+                                // Initialize local fields with defaults
+                                initializeLocalFields(partialItem as Record<string, unknown>, collectionName);
+                                // Create the item
                                 (collection as Record<string, unknown>)[itemId] = partialItem;
                             }
                             // Otherwise ignore incomplete items

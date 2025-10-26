@@ -16,7 +16,7 @@ import type { z } from 'zod';
 /**
  * Field type discriminator
  */
-export type FieldType = 'mutable' | 'immutable' | 'reference';
+export type FieldType = 'mutable' | 'immutable' | 'reference' | 'local';
 
 /**
  * Mutable field descriptor
@@ -34,6 +34,21 @@ export interface MutableFieldDescriptor<T = unknown> {
  */
 export interface ImmutableFieldDescriptor<T = unknown> {
     readonly fieldType: 'immutable';
+    // Phantom type parameter for TypeScript type inference
+    readonly __type?: T;
+}
+
+/**
+ * Local field descriptor
+ * Local fields are client-side only and track when they were last changed
+ * - Always initialized with a default value
+ * - Can be mutated locally (tracked with changedAt)
+ * - NOT synced from server (server updates ignore local fields)
+ * - Useful for UI state like selection, expansion, etc.
+ */
+export interface LocalFieldDescriptor<T = unknown> {
+    readonly fieldType: 'local';
+    readonly defaultValue: T;
     // Phantom type parameter for TypeScript type inference
     readonly __type?: T;
 }
@@ -58,6 +73,7 @@ export interface ReferenceFieldDescriptor<TCollection extends string = string, T
 export type FieldDescriptor<T = unknown> =
     | MutableFieldDescriptor<T>
     | ImmutableFieldDescriptor<T>
+    | LocalFieldDescriptor<T>
     | ReferenceFieldDescriptor<any, any>;
 
 /**
@@ -89,6 +105,33 @@ export function mutable<T>(): MutableFieldDescriptor<T> {
  */
 export function immutable<T>(): ImmutableFieldDescriptor<T> {
     return { fieldType: 'immutable' } as ImmutableFieldDescriptor<T>;
+}
+
+/**
+ * Create a local field descriptor
+ * Local fields are client-side only and not synced from server
+ *
+ * Local fields:
+ * - Always have a default value
+ * - Track changes locally (with changedAt timestamp)
+ * - Are NOT updated from server snapshots (always use default value)
+ * - Perfect for UI state (selection, expansion, filters, etc.)
+ *
+ * @param defaultValue - The default value to use when creating new items
+ *
+ * @example
+ * const schema = defineSchema({
+ *   todos: type({
+ *     fields: {
+ *       title: mutable<string>(),
+ *       isExpanded: local(false),     // UI state: always false for new items
+ *       isSelected: local(false),     // UI state: always false for new items
+ *     }
+ *   })
+ * });
+ */
+export function local<T>(defaultValue: T): LocalFieldDescriptor<T> {
+    return { fieldType: 'local', defaultValue } as LocalFieldDescriptor<T>;
 }
 
 /**
@@ -321,25 +364,29 @@ type ExtractFields<T> = T extends CollectionType<infer TFields> ? TFields : neve
  * Helper to infer the value type for a field in Create/Update
  * - Mutable fields: plain value T
  * - Immutable fields: plain value T
+ * - Local fields: plain value T
  * - References (non-nullable): string
  * - References (nullable): string | null
  */
 type InferFieldValue<TField> =
     TField extends ReferenceFieldDescriptor<any, infer TNullable>
         ? TNullable extends true ? string | null : string
-        : TField extends FieldDescriptor<infer T>
+        : TField extends LocalFieldDescriptor<infer T>
             ? T
-            : never;
+            : TField extends FieldDescriptor<infer T>
+                ? T
+                : never;
 
 /**
  * Infer the Create input type for a collection
  *
  * Returns an object with:
  * - id: string (required - must specify the item ID)
- * - All user-defined fields
+ * - All user-defined fields EXCEPT local fields
  * - Mutable fields as plain values
  * - Immutable fields as plain values
  * - Reference fields as string (or string | null if nullable)
+ * - Local fields are NOT included (they use default values)
  *
  * @example
  * type CreateTodo = InferCreate<typeof schema, 'todos'>;
@@ -348,7 +395,7 @@ type InferFieldValue<TField> =
 export type InferCreate<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
     id: string;
 } & {
-    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>]: InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]> as ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]['fieldType'] extends 'local' ? never : K]: InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
 }>;
 
 /**
@@ -356,24 +403,25 @@ export type InferCreate<TSchema, TCollection extends keyof ExtractSchemaDefiniti
  *
  * Returns a partial object with:
  * - id: string (required - must specify which item to update)
- * - Only mutable fields (immutable fields and references cannot be updated)
- * - All mutable fields are optional
+ * - Only mutable and local fields (immutable fields and references cannot be updated)
+ * - All mutable and local fields are optional
  * - Values are plain (not wrapped)
  *
  * @example
  * type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
- * // { id: string; title?: string; completed?: boolean }
+ * // { id: string; title?: string; completed?: boolean; isSelected?: boolean }
  */
 export type InferUpdate<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
     id: string;
 } & {
-    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]> as ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]['fieldType'] extends 'mutable' ? K : never]?:
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]> as ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]['fieldType'] extends 'mutable' | 'local' ? K : never]?:
         InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
 }>;
 
 /**
  * Helper to infer the item representation for a field
  * - Mutable fields: { value: T, changedAt: number }
+ * - Local fields: { value: T, changedAt: number }
  * - Immutable fields: plain value T
  * - References: string or string | null (no changedAt tracking)
  */
@@ -382,9 +430,11 @@ type InferItemField<TField> =
         ? TNullable extends true ? string | null : string
         : TField extends MutableFieldDescriptor<infer T>
             ? { value: T; changedAt: number }
-            : TField extends ImmutableFieldDescriptor<infer T>
-                ? T
-                : never;
+            : TField extends LocalFieldDescriptor<infer T>
+                ? { value: T; changedAt: number }
+                : TField extends ImmutableFieldDescriptor<infer T>
+                    ? T
+                    : never;
 
 /**
  * Infer the in-memory Item type for a collection
@@ -456,11 +506,11 @@ type DenormalizedValues<TSchema extends CollectionSchema> = {
 };
 
 /**
- * Helper type to extract changedAt fields for mutable fields only
+ * Helper type to extract changedAt fields for mutable and local fields
  * References and immutable fields don't have changedAt
  */
 type DenormalizedChangedAt<TSchema extends CollectionSchema> = {
-    [K in keyof TSchema & string as TSchema[K]['fieldType'] extends 'mutable' ? `${K}ChangedAt` : never]: number;
+    [K in keyof TSchema & string as TSchema[K]['fieldType'] extends 'mutable' | 'local' ? `${K}ChangedAt` : never]: number;
 };
 
 /**
