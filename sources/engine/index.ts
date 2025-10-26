@@ -6,33 +6,8 @@
 export type {
     ItemId,
     Timestamp,
-    MutableField,
-    Mutable,
-    Item,
-    CollectionConfig,
-    CollectionState,
-    OperationId,
-    DiffOperation,
-    Diff,
-    OperationResult,
-    DiffResult,
+    OperationId
 } from './types';
-
-// Collection
-export { Collection } from './collection';
-
-// Client Collection
-export { ClientCollection } from './client-collection';
-export type { PendingOperation, ClientCollectionConfig } from './client-collection';
-
-// Helpers
-export {
-    createItemId,
-    createOperationId,
-    mutable,
-    mutableAt,
-    updateMutable,
-} from './helpers';
 
 // Schema DSL
 export {
@@ -51,10 +26,20 @@ export type {
     CollectionSchema,
     CollectionType,
     SchemaDefinition,
+    MutationDefinition,
+    FullSchemaDefinition,
     Schema,
     InferCreate,
     InferUpdate,
     InferItem,
+    InferItemState,
     InferDenormalized,
     InferCollections,
+    InferMutationInput,
+    InferMutationOutput,
+    InferMutations,
 } from './schema';
+
+// Sync Engine
+export { sync } from './sync';
+export type { SyncState, SyncEngine, PartialServerUpdate, PendingMutation } from './sync';

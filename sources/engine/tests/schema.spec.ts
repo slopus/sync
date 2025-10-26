@@ -14,6 +14,7 @@ import {
     type InferCreate,
     type InferUpdate,
     type InferItem,
+    type InferItemState,
     type InferDenormalized,
     type InferCollections,
 } from '../index';
@@ -94,8 +95,8 @@ describe('Schema DSL', () => {
             });
 
             expect(schema._schema).toBeDefined();
-            expect(schema._schema.todos).toBeDefined();
-            expect(schema._schema.users).toBeDefined();
+            expect(schema._schema.types.todos).toBeDefined();
+            expect(schema._schema.types.users).toBeDefined();
         });
 
         it('should access collection schema', () => {
@@ -308,6 +309,88 @@ describe('Schema DSL', () => {
                 createdAt: number;
                 name: { value: string; changedAt: number };
             }>();
+        });
+    });
+
+    describe('Type Inference - ItemState', () => {
+        it('should infer item state type with plain values', () => {
+            const schema = defineSchema({
+                todos: type({
+                    fields: {
+                        title: mutableField<string>(),
+                        completed: mutableField<boolean>(),
+                        priority: immutableField<number>(),
+                    },
+                }),
+            });
+
+            type TodoState = InferItemState<typeof schema, 'todos'>;
+
+            // Type assertions - all fields are plain values
+            expectTypeOf<TodoState>().toMatchTypeOf<{
+                id: string;
+                createdAt: number;
+                title: string;
+                completed: boolean;
+                priority: number;
+            }>();
+
+            // Runtime usage example
+            const validItem: TodoState = {
+                id: '123',
+                createdAt: Date.now(),
+                title: 'Test',
+                completed: false,
+                priority: 1,
+            };
+
+            expect(validItem).toBeDefined();
+        });
+
+        it('should handle references in item state', () => {
+            const schema = defineSchema({
+                users: type({
+                    fields: {
+                        name: mutableField<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: mutableField<string>(),
+                        assignedTo: reference('users'),
+                        reviewer: reference('users', { nullable: true }),
+                    },
+                }),
+            });
+
+            type TodoState = InferItemState<typeof schema, 'todos'>;
+
+            expectTypeOf<TodoState>().toMatchTypeOf<{
+                id: string;
+                createdAt: number;
+                title: string;
+                assignedTo: string;
+                reviewer: string | null;
+            }>();
+        });
+
+        it('should differ from InferItem by having plain values', () => {
+            const schema = defineSchema({
+                todos: type({
+                    fields: {
+                        title: mutableField<string>(),
+                    },
+                }),
+            });
+
+            type TodoItem = InferItem<typeof schema, 'todos'>;
+            type TodoState = InferItemState<typeof schema, 'todos'>;
+
+            // InferItem wraps mutable fields
+            expectTypeOf<TodoItem['title']>().toEqualTypeOf<{ value: string; changedAt: number }>();
+
+            // InferItemState has plain values
+            expectTypeOf<TodoState['title']>().toEqualTypeOf<string>();
         });
     });
 
@@ -796,7 +879,7 @@ describe('Schema DSL', () => {
                 _schema: typeof schema,
                 name: T
             ): boolean {
-                return name in schema._schema;
+                return name in schema._schema.types;
             }
 
             expect(hasCollection(schema, 'todos')).toBe(true);

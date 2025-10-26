@@ -7,6 +7,8 @@
  * - Automatic type inference for Create, Update, Item, and Denormalized representations
  */
 
+import type { z } from 'zod';
+
 // ============================================================================
 // Field Descriptors
 // ============================================================================
@@ -191,6 +193,27 @@ export type SchemaDefinition = {
     [collectionName: string]: CollectionType;
 };
 
+// ============================================================================
+// Mutation Definitions
+// ============================================================================
+
+/**
+ * Mutation definition
+ * Maps mutation names to their Zod schema types
+ */
+export type MutationDefinition = {
+    [mutationName: string]: z.ZodTypeAny;
+};
+
+/**
+ * Complete schema with types and mutations
+ * Combines collection type definitions with mutation definitions
+ */
+export type FullSchemaDefinition = {
+    types: SchemaDefinition;
+    mutations?: MutationDefinition;
+};
+
 /**
  * Helper type to extract all reference field collection names from a field schema
  */
@@ -219,9 +242,17 @@ type ValidateReferences<TSchema extends SchemaDefinition> = {
 };
 
 /**
+ * Helper type to validate references in a full schema definition
+ */
+type ValidateFullSchema<T extends FullSchemaDefinition> = {
+    types: ValidateReferences<T['types']> extends T['types'] ? T['types'] : ValidateReferences<T['types']>;
+    mutations: T['mutations'];
+};
+
+/**
  * Typed schema object returned by defineSchema
  */
-export type Schema<T extends SchemaDefinition> = {
+export type Schema<T extends FullSchemaDefinition> = {
     /**
      * Runtime schema data
      * Preserves the schema definition for later use (e.g., validation)
@@ -231,7 +262,17 @@ export type Schema<T extends SchemaDefinition> = {
     /**
      * Get the field schema for a specific collection
      */
-    collection<K extends keyof T>(name: K): T[K] extends CollectionType<infer TFields> ? TFields : never;
+    collection<K extends keyof T['types']>(name: K): T['types'][K] extends CollectionType<infer TFields> ? TFields : never;
+
+    /**
+     * Get the Zod schema for a specific mutation
+     */
+    mutation<K extends keyof NonNullable<T['mutations']>>(name: K): NonNullable<T['mutations']>[K];
+
+    /**
+     * Get all mutation names
+     */
+    mutations(): T['mutations'] extends MutationDefinition ? (keyof T['mutations'])[] : never;
 };
 
 // ============================================================================
@@ -245,9 +286,15 @@ export type Schema<T extends SchemaDefinition> = {
 type Simplify<T> = { [K in keyof T]: T[K] };
 
 /**
- * Helper type to extract SchemaDefinition from Schema or use raw SchemaDefinition
+ * Helper type to extract SchemaDefinition from Schema or use raw FullSchemaDefinition
  */
-type ExtractSchemaDefinition<T> = T extends Schema<infer S> ? S : T extends SchemaDefinition ? T : never;
+type ExtractSchemaDefinition<T> = T extends Schema<infer S>
+    ? S['types']
+    : T extends FullSchemaDefinition
+        ? T['types']
+        : T extends SchemaDefinition
+            ? T
+            : never;
 
 /**
  * Infer all collection names from a schema as a union type
@@ -368,6 +415,38 @@ export type InferItem<TSchema, TCollection extends keyof ExtractSchemaDefinition
 }>;
 
 /**
+ * Infer the plain item state type for a collection
+ *
+ * Returns an object with:
+ * - id: string (auto-added)
+ * - createdAt: number (auto-added immutable)
+ * - All fields as plain values (no { value, changedAt } wrapping)
+ * - Mutable fields as plain values
+ * - Immutable fields as plain values
+ * - Reference fields as string (or string | null if nullable)
+ *
+ * This is useful for working with items in a simplified state where you don't need
+ * to track individual field change timestamps.
+ *
+ * @example
+ * type TodoState = InferItemState<typeof schema, 'todos'>;
+ * // {
+ * //   id: string;
+ * //   createdAt: number;
+ * //   title: string;
+ * //   completed: boolean;
+ * //   priority: number;
+ * //   assignedTo: string;
+ * // }
+ */
+export type InferItemState<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
+    id: string;
+    createdAt: number;
+} & {
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>]: InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
+}>;
+
+/**
  * Helper type to extract all field values from a collection schema
  * - Mutable/Immutable fields: plain value T
  * - References: string or string | null
@@ -415,19 +494,127 @@ export type InferDenormalized<TSchema, TCollection extends keyof ExtractSchemaDe
       & DenormalizedChangedAt<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>>
 >;
 
+/**
+ * Helper type to extract mutation definitions from a schema
+ */
+type ExtractMutationDefinition<T> = T extends Schema<infer S>
+    ? S['mutations']
+    : T extends FullSchemaDefinition
+        ? T['mutations']
+        : never;
+
+/**
+ * Infer the input type for a mutation from its Zod schema
+ *
+ * Returns the inferred input type from the Zod schema.
+ *
+ * @example
+ * const schema = defineSchema({
+ *   types: { ... },
+ *   mutations: {
+ *     createTodo: z.object({ title: z.string(), completed: z.boolean() }),
+ *   }
+ * });
+ *
+ * type CreateTodoInput = InferMutationInput<typeof schema, 'createTodo'>;
+ * // { title: string; completed: boolean }
+ */
+export type InferMutationInput<TSchema, TMutation extends keyof NonNullable<ExtractMutationDefinition<TSchema>>> =
+    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends z.ZodTypeAny
+        ? z.input<NonNullable<ExtractMutationDefinition<TSchema>>[TMutation]>
+        : never;
+
+/**
+ * Infer the output type for a mutation from its Zod schema
+ *
+ * Returns the inferred output type from the Zod schema (after parsing).
+ *
+ * @example
+ * const schema = defineSchema({
+ *   types: { ... },
+ *   mutations: {
+ *     createTodo: z.object({ title: z.string(), completed: z.boolean().default(false) }),
+ *   }
+ * });
+ *
+ * type CreateTodoOutput = InferMutationOutput<typeof schema, 'createTodo'>;
+ * // { title: string; completed: boolean }
+ */
+export type InferMutationOutput<TSchema, TMutation extends keyof NonNullable<ExtractMutationDefinition<TSchema>>> =
+    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends z.ZodTypeAny
+        ? z.output<NonNullable<ExtractMutationDefinition<TSchema>>[TMutation]>
+        : never;
+
+/**
+ * Infer all mutation names from a schema as a union type
+ *
+ * Returns a union of all mutation names defined in the schema.
+ *
+ * @example
+ * const schema = defineSchema({
+ *   types: { ... },
+ *   mutations: {
+ *     createTodo: z.object({ title: z.string() }),
+ *     updateTodo: z.object({ id: z.string(), title: z.string().optional() })
+ *   }
+ * });
+ *
+ * type Mutations = InferMutations<typeof schema>;
+ * // 'createTodo' | 'updateTodo'
+ */
+export type InferMutations<TSchema> = keyof NonNullable<ExtractMutationDefinition<TSchema>>;
+
 // ============================================================================
 // Schema Definition Function
 // ============================================================================
 
 /**
- * Define a schema for collections
+ * Helper to detect if a schema definition is in the old format (direct SchemaDefinition)
+ * or new format (FullSchemaDefinition with types/mutations)
+ */
+function isFullSchemaDefinition(schema: unknown): schema is FullSchemaDefinition {
+    return typeof schema === 'object' && schema !== null && 'types' in schema;
+}
+
+// Overload signatures
+export function defineSchema<T extends SchemaDefinition>(
+    schema: ValidateReferences<T> extends T ? T : ValidateReferences<T>
+): Schema<{ types: T; mutations?: undefined }>;
+export function defineSchema<T extends FullSchemaDefinition>(
+    schema: ValidateFullSchema<T> extends T ? T : ValidateFullSchema<T>
+): Schema<T>;
+
+/**
+ * Define a schema for collections and mutations
  * Validates that all references point to collections that exist in the schema
  *
- * @param schema - Schema definition mapping collection names to type definitions
+ * @param schema - Schema definition (SchemaDefinition or FullSchemaDefinition with types and optional mutations)
  * @returns Typed schema object with type inference utilities
  *
  * @example
+ * // New format with types and mutations
  * const schema = defineSchema({
+ *   types: {
+ *     users: type({
+ *       fields: {
+ *         name: mutable<string>(),
+ *       }
+ *     }),
+ *     todos: type({
+ *       fields: {
+ *         title: mutable<string>(),
+ *         assignedTo: reference('users'), // Valid - 'users' exists
+ *       }
+ *     })
+ *   },
+ *   mutations: {
+ *     createTodo: z.object({ title: z.string() }),
+ *     updateTodo: z.object({ id: z.string(), title: z.string().optional() })
+ *   }
+ * });
+ *
+ * // Old format (backward compatible - automatically wrapped in types)
+ * const legacySchema = defineSchema({
  *   users: type({
  *     fields: {
  *       name: mutable<string>(),
@@ -436,16 +623,6 @@ export type InferDenormalized<TSchema, TCollection extends keyof ExtractSchemaDe
  *   todos: type({
  *     fields: {
  *       title: mutable<string>(),
- *       assignedTo: reference('users'), // Valid - 'users' exists
- *     }
- *   })
- * });
- *
- * // Invalid references produce type errors:
- * const badSchema = defineSchema({
- *   todos: type({
- *     fields: {
- *       assignedTo: reference('users'), // Error - 'users' doesn't exist!
  *     }
  *   })
  * });
@@ -456,13 +633,25 @@ export type InferDenormalized<TSchema, TCollection extends keyof ExtractSchemaDe
  * type Todo = InferItem<typeof schema, 'todos'>;
  * type TodoDenorm = InferDenormalized<typeof schema, 'todos'>;
  */
-export function defineSchema<T extends SchemaDefinition>(
-    schema: ValidateReferences<T> extends T ? T : ValidateReferences<T>
-): Schema<T> {
+export function defineSchema(schema: unknown): unknown {
+    // Normalize to FullSchemaDefinition format
+    const normalized: FullSchemaDefinition = isFullSchemaDefinition(schema)
+        ? schema
+        : { types: schema as SchemaDefinition };
+
     return {
-        _schema: schema as T,
-        collection<K extends keyof T>(name: K): T[K] extends CollectionType<infer TFields> ? TFields : never {
-            return (schema as T)[name].fields as T[K] extends CollectionType<infer TFields> ? TFields : never;
+        _schema: normalized,
+        collection(name: string): unknown {
+            return normalized.types[name]?.fields;
+        },
+        mutation(name: string): unknown {
+            if (!normalized.mutations) {
+                throw new Error(`Mutations are not defined in this schema`);
+            }
+            return normalized.mutations[name];
+        },
+        mutations(): string[] {
+            return normalized.mutations ? Object.keys(normalized.mutations) : [];
         },
     };
 }
