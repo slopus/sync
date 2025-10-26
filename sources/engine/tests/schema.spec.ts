@@ -15,6 +15,7 @@ import {
     type InferUpdate,
     type InferItem,
     type InferDenormalized,
+    type InferCollections,
 } from '../index';
 
 describe('Schema DSL', () => {
@@ -677,6 +678,129 @@ describe('Schema DSL', () => {
                 message: string;
                 timestamp: number;
             }>();
+        });
+    });
+
+    describe('Type Inference - InferCollections', () => {
+        it('should infer collection names as union type', () => {
+            const schema = defineSchema({
+                users: type({
+                    fields: {
+                        name: mutableField<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: mutableField<string>(),
+                    },
+                }),
+                settings: type({
+                    fields: {
+                        theme: mutableField<string>(),
+                    },
+                }),
+            });
+
+            type Collections = InferCollections<typeof schema>;
+
+            // Should be union of collection names
+            expectTypeOf<Collections>().toEqualTypeOf<'users' | 'todos' | 'settings'>();
+
+            // Test that it works in runtime contexts
+            const validCollection1: Collections = 'users';
+            const validCollection2: Collections = 'todos';
+            const validCollection3: Collections = 'settings';
+
+            // @ts-expect-error - invalid collection name
+            const invalidCollection: Collections = 'invalid';
+
+            expect(validCollection1).toBe('users');
+            expect(validCollection2).toBe('todos');
+            expect(validCollection3).toBe('settings');
+            expect(invalidCollection).toBe('invalid');
+        });
+
+        it('should work with single collection schema', () => {
+            const schema = defineSchema({
+                items: type({
+                    fields: {
+                        value: mutableField<number>(),
+                    },
+                }),
+            });
+
+            type Collections = InferCollections<typeof schema>;
+
+            expectTypeOf<Collections>().toEqualTypeOf<'items'>();
+
+            const collection: Collections = 'items';
+            expect(collection).toBe('items');
+        });
+
+        it('should work with complex multi-collection schemas', () => {
+            const schema = defineSchema({
+                users: type({
+                    fields: {
+                        name: mutableField<string>(),
+                    },
+                }),
+                posts: type({
+                    fields: {
+                        title: mutableField<string>(),
+                        authorId: reference('users'),
+                    },
+                }),
+                comments: type({
+                    fields: {
+                        text: mutableField<string>(),
+                        postId: reference('posts'),
+                        authorId: reference('users'),
+                    },
+                }),
+            });
+
+            type Collections = InferCollections<typeof schema>;
+
+            expectTypeOf<Collections>().toEqualTypeOf<'users' | 'posts' | 'comments'>();
+        });
+
+        it('should be useful for generic collection operations', () => {
+            const schema = defineSchema({
+                todos: type({
+                    fields: {
+                        title: mutableField<string>(),
+                    },
+                }),
+                users: type({
+                    fields: {
+                        name: mutableField<string>(),
+                    },
+                }),
+            });
+
+            type Collections = InferCollections<typeof schema>;
+
+            // Type-safe collection selector with specific return types
+            const todoFields = schema.collection('todos');
+            const userFields = schema.collection('users');
+
+            // Verify the fields are correctly typed
+            expect(todoFields.title.fieldType).toBe('mutable');
+            expect(userFields.name.fieldType).toBe('mutable');
+
+            // Verify Collections type is correct
+            expectTypeOf<Collections>().toEqualTypeOf<'todos' | 'users'>();
+
+            // Test usage in a generic function
+            function hasCollection<T extends Collections>(
+                _schema: typeof schema,
+                name: T
+            ): boolean {
+                return name in schema._schema;
+            }
+
+            expect(hasCollection(schema, 'todos')).toBe(true);
+            expect(hasCollection(schema, 'users')).toBe(true);
         });
     });
 });

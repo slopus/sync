@@ -56,4 +56,5 @@ export type {
     InferUpdate,
     InferItem,
     InferDenormalized,
+    InferCollections,
 } from './schema';

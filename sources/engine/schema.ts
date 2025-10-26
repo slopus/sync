@@ -250,6 +250,22 @@ type Simplify<T> = { [K in keyof T]: T[K] };
 type ExtractSchemaDefinition<T> = T extends Schema<infer S> ? S : T extends SchemaDefinition ? T : never;
 
 /**
+ * Infer all collection names from a schema as a union type
+ *
+ * Returns a union of all collection names defined in the schema.
+ *
+ * @example
+ * const schema = defineSchema({
+ *   users: type({ fields: { name: mutable<string>() } }),
+ *   todos: type({ fields: { title: mutable<string>() } })
+ * });
+ *
+ * type Collections = InferCollections<typeof schema>;
+ * // 'users' | 'todos'
+ */
+export type InferCollections<TSchema> = keyof ExtractSchemaDefinition<TSchema>;
+
+/**
  * Helper type to extract CollectionSchema fields from a collection type
  */
 type ExtractFields<T> = T extends CollectionType<infer TFields> ? TFields : never;
