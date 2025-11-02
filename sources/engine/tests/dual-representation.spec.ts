@@ -36,7 +36,6 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: 1000,
                     title: 'First Title',
                     completed: false,
                 }],
@@ -76,7 +75,6 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Test',
                 }],
             });
@@ -119,7 +117,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 1,
-                    createdAt: 1000,
                     title: 'Old Title',
                     completed: false,
                 }],
@@ -165,7 +162,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 3,
-                    createdAt: 1000,
                     title: 'Newest Title',
                     completed: true,
                 }],
@@ -212,7 +208,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 1,
-                    createdAt: 1000,
                     title: 'Original Title',
                     completed: false,
                 }],
@@ -287,7 +282,6 @@ describe('Dual-Representation Architecture', () => {
                 users: [{
                     id: 'user-1',
                     version: 1,
-                    createdAt: 1000,
                     name: 'Alice',
                 }],
             });
@@ -298,7 +292,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 2,
-                    createdAt: 2000,
                     title: 'Test Todo',
                     assignedTo: 'user-1',
                 }],
@@ -342,7 +335,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 1,
-                    createdAt: Date.now(),
                     title: 'Test',
                     completed: false,
                 }],
@@ -352,7 +344,6 @@ describe('Dual-Representation Architecture', () => {
             const todo = engine.serverState.todos['todo-1'];
             expect(typeof todo.title).toBe('string');
             expect(typeof todo.completed).toBe('boolean');
-            expect(typeof todo.createdAt).toBe('number');
             expect(typeof todo.id).toBe('string');
         });
 
@@ -388,7 +379,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 1,
-                    createdAt: Date.now(),
                     title: 'Server Title',
                     completed: false,
                 }],
@@ -430,7 +420,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 1,
-                    createdAt: Date.now(),
                     title: 'Test',
                     // isExpanded not provided by server
                 }],
@@ -464,7 +453,6 @@ describe('Dual-Representation Architecture', () => {
                 todos: [{
                     id: 'todo-1',
                     version: 1,
-                    createdAt: 1000,
                     title: 'Test',
                 }],
             });

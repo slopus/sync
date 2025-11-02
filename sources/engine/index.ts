@@ -15,6 +15,7 @@ export type {
 export {
     defineSchema,
     type,
+    object,
     field,
     local as localField,
     reference,
@@ -27,6 +28,7 @@ export type {
     FieldDescriptor,
     CollectionSchema,
     CollectionType,
+    ObjectType,
     SchemaDefinition,
     MutationDefinition,
     FullSchemaDefinition,
@@ -37,6 +39,8 @@ export type {
     InferItem,
     InferItemState,
     InferServerItemState,
+    InferObjectState,
+    InferServerObjectState,
     InferDenormalized,
     InferCollections,
     InferMutationInput,
@@ -46,4 +50,4 @@ export type {
 
 // Sync Engine
 export { syncEngine } from './engine';
-export type { SyncState, ServerSnapshot, SyncEngine, PartialServerUpdate, PendingMutation } from './engine';
+export type { SyncState, ServerSnapshot, SyncEngine, PartialServerUpdate, PendingMutation, RebaseOptions } from './engine';

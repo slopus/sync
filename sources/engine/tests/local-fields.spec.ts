@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
     defineSchema,
     type,
+    object,
     field,
     localField,
     syncEngine,
@@ -116,7 +117,6 @@ describe('Local Fields', () => {
             // Local fields should have same structure as mutable fields
             expectTypeOf<Todo>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: { value: string; version: number };
                 isExpanded: { value: boolean; version: number };
             }>();
@@ -141,7 +141,6 @@ describe('Local Fields', () => {
 
             expectTypeOf<TodoState>().toEqualTypeOf<{
                 id: string;
-                createdAt: number;
                 title: string;
                 isExpanded: boolean;
             }>();
@@ -169,7 +168,6 @@ describe('Local Fields', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Test Todo',
                 }],
             });
@@ -211,7 +209,6 @@ describe('Local Fields', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Original Title',
                 }],
             });
@@ -268,7 +265,6 @@ describe('Local Fields', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Test',
                 }],
             });
@@ -326,7 +322,6 @@ describe('Local Fields', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Task',
                     priority: 1,
                 }],
@@ -373,7 +368,6 @@ describe('Local Fields', () => {
             engine.rebase({
                 items: [{
                     id: 'item-1',
-                    createdAt: Date.now(),
                     name: 'Test',
                 }],
             });
@@ -383,6 +377,278 @@ describe('Local Fields', () => {
             expect(item.selectedCount).toBe(0);
             expect(item.tags).toEqual([]);
             expect(item.metadata).toEqual({ foo: 'bar' });
+        });
+    });
+
+    describe('Rebase Options', () => {
+        it('should update local fields when allowLocalFields is true', () => {
+            const schema = defineSchema({
+                types: {
+                    todos: type({
+                        fields: {
+                            title: field<string>(),
+                            isExpanded: localField(false),
+                        },
+                    }),
+                },
+                mutations: {},
+            });
+
+            const engine = syncEngine(schema);
+
+            // Create item with default local field
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Test',
+                }],
+            });
+
+            expect(engine.serverState.todos['todo-1'].isExpanded).toBe(false);
+
+            // Update local field with allowLocalFields: true
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    isExpanded: true,
+                }],
+            }, { allowLocalFields: true });
+
+            // Local field should be updated
+            expect(engine.serverState.todos['todo-1'].isExpanded).toBe(true);
+        });
+
+        it('should ignore server fields when allowServerFields is false', () => {
+            const schema = defineSchema({
+                types: {
+                    todos: type({
+                        fields: {
+                            title: field<string>(),
+                            completed: field<boolean>(),
+                        },
+                    }),
+                },
+                mutations: {},
+            });
+
+            const engine = syncEngine(schema);
+
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Original',
+                    completed: false,
+                }],
+            });
+
+            // Try to update with allowServerFields: false
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Updated',
+                    completed: true,
+                }],
+            }, { allowServerFields: false });
+
+            // Server fields should NOT be updated
+            expect(engine.serverState.todos['todo-1'].title).toBe('Original');
+            expect(engine.serverState.todos['todo-1'].completed).toBe(false);
+        });
+
+        it('should update only local fields when both options are set appropriately', () => {
+            const schema = defineSchema({
+                types: {
+                    todos: type({
+                        fields: {
+                            title: field<string>(),
+                            isExpanded: localField(false),
+                        },
+                    }),
+                },
+                mutations: {},
+            });
+
+            const engine = syncEngine(schema);
+
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Original',
+                }],
+            });
+
+            // Update both, but only allow local fields
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Updated',
+                    isExpanded: true,
+                }],
+            }, { allowServerFields: false, allowLocalFields: true });
+
+            // Only local field should be updated
+            expect(engine.serverState.todos['todo-1'].title).toBe('Original');
+            expect(engine.serverState.todos['todo-1'].isExpanded).toBe(true);
+        });
+
+        it('should update both server and local fields when both are allowed', () => {
+            const schema = defineSchema({
+                types: {
+                    todos: type({
+                        fields: {
+                            title: field<string>(),
+                            isExpanded: localField(false),
+                        },
+                    }),
+                },
+                mutations: {},
+            });
+
+            const engine = syncEngine(schema);
+
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Original',
+                }],
+            });
+
+            // Update both with allowLocalFields: true
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Updated',
+                    isExpanded: true,
+                }],
+            }, { allowLocalFields: true });
+
+            // Both should be updated
+            expect(engine.serverState.todos['todo-1'].title).toBe('Updated');
+            expect(engine.serverState.todos['todo-1'].isExpanded).toBe(true);
+        });
+
+        it('should patch both states directly when direct is true', () => {
+            const schema = defineSchema({
+                types: {
+                    todos: type({
+                        fields: {
+                            title: field<string>(),
+                            completed: field<boolean>(),
+                        },
+                    }),
+                },
+                mutations: {
+                    toggleCompleted: z.object({ id: z.string() }),
+                },
+            });
+
+            const engine = syncEngine(schema);
+
+            engine.addMutator('toggleCompleted', (draft, input) => {
+                if (draft.todos[input.id]) {
+                    draft.todos[input.id].completed = !draft.todos[input.id].completed;
+                }
+            });
+
+            // Create item
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Test',
+                    completed: false,
+                }],
+            });
+
+            // Apply mutation
+            engine.mutate('toggleCompleted', { id: 'todo-1' });
+            expect(engine.state.todos['todo-1'].completed).toBe(true);
+
+            // Update server with direct: true (should not reapply mutation)
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Updated',
+                }],
+            }, { direct: true });
+
+            // serverState should be updated
+            expect(engine.serverState.todos['todo-1'].title).toBe('Updated');
+
+            // Direct mode: both states patched, mutation NOT reapplied
+            // State is patched with new title, but completed stays true (not in update)
+            expect(engine.state.todos['todo-1'].title).toBe('Updated');
+            expect(engine.state.todos['todo-1'].completed).toBe(true);
+        });
+
+        it('should work with singleton objects and allowLocalFields', () => {
+            const schema = defineSchema({
+                types: {
+                    settings: object({
+                        fields: {
+                            theme: field<string>(),
+                            isExpanded: localField(false),
+                        },
+                    }),
+                },
+                mutations: {},
+            });
+
+            const engine = syncEngine(schema);
+
+            // Create singleton
+            engine.rebase({
+                settings: {
+                    theme: 'light',
+                },
+            });
+
+            expect(engine.serverState.settings.isExpanded).toBe(false);
+
+            // Update local field
+            engine.rebase({
+                settings: {
+                    isExpanded: true,
+                },
+            }, { allowLocalFields: true });
+
+            expect(engine.serverState.settings.theme).toBe('light');
+            expect(engine.serverState.settings.isExpanded).toBe(true);
+        });
+
+        it('should preserve default behavior when no options provided', () => {
+            const schema = defineSchema({
+                types: {
+                    todos: type({
+                        fields: {
+                            title: field<string>(),
+                            isExpanded: localField(false),
+                        },
+                    }),
+                },
+                mutations: {},
+            });
+
+            const engine = syncEngine(schema);
+
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Test',
+                }],
+            });
+
+            // Try to update local field without options (should be ignored)
+            engine.rebase({
+                todos: [{
+                    id: 'todo-1',
+                    title: 'Updated',
+                    isExpanded: true,
+                }],
+            });
+
+            // Server field updated, local field ignored (default behavior)
+            expect(engine.serverState.todos['todo-1'].title).toBe('Updated');
+            expect(engine.serverState.todos['todo-1'].isExpanded).toBe(false);
         });
     });
 });

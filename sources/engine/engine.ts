@@ -1,35 +1,52 @@
-import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ExtractSchemaDefinition } from "./schema";
+import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ObjectType, ExtractSchemaDefinition, InferObjectState, InferServerObjectState } from "./schema";
 import { produce } from 'immer';
 import { createId } from '@paralleldrive/cuid2';
-import { FieldValue, Version } from "./types";
+import { FieldValue } from "./types";
 
 /**
- * Helper type to check if a collection has versioning enabled
+ * Helper type to check if a collection or object has versioning enabled
  */
 type HasVersionTracking<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> =
-    ExtractSchemaDefinition<TSchema>[TCollection] extends CollectionType<infer TFields>
+    ExtractSchemaDefinition<TSchema>[TCollection] extends CollectionType<any> | ObjectType<any>
         ? ExtractSchemaDefinition<TSchema>[TCollection] extends { versioned: true }
             ? true
             : false
         : false;
 
 /**
+ * Helper to determine state structure based on type (collection vs singleton)
+ */
+type InferStateForType<T extends FullSchemaDefinition, K extends keyof T['types']> =
+    T['types'][K] extends ObjectType
+        ? InferObjectState<Schema<T>, K>  // Direct object (no Record wrapper)
+        : Record<string, InferItemState<Schema<T>, K>>;  // Collection (key-indexed)
+
+/**
+ * Helper to determine server state structure based on type (collection vs singleton)
+ */
+type InferServerStateForType<T extends FullSchemaDefinition, K extends keyof T['types']> =
+    T['types'][K] extends ObjectType
+        ? InferServerObjectState<Schema<T>, K>  // Direct object (no Record wrapper)
+        : Record<string, InferServerItemState<Schema<T>, K>>;  // Collection (key-indexed)
+
+/**
  * State type for the sync engine (client-side representation)
- * Maps collection names to records of items indexed by ID
+ * - Collections: Record of items indexed by ID
+ * - Singleton objects: Direct object access (no key)
  * All fields are unwrapped (plain values)
  */
 export type SyncState<T extends FullSchemaDefinition> = {
-    [K in keyof T['types']]: Record<string, InferItemState<Schema<T>, K>>
+    [K in keyof T['types']]: InferStateForType<T, K>
 };
 
 /**
  * Server snapshot type (server-side internal representation)
+ * - Collections: Record of items with wrapped fields and per-item versions
+ * - Singleton objects: Direct object with wrapped fields and version
  * Contains wrapped field values with versions for LWW conflict resolution
- * Version tracking is per-object, not global
  */
 export type ServerSnapshot<T extends FullSchemaDefinition> = {
-    /** Collections containing server item states (wrapped fields with per-object versions) */
-    [K in keyof T['types']]: Record<string, InferServerItemState<Schema<T>, K>>
+    [K in keyof T['types']]: InferServerStateForType<T, K>
 };
 
 /**
@@ -37,13 +54,8 @@ export type ServerSnapshot<T extends FullSchemaDefinition> = {
  *
  * This represents a mutation that is:
  * - Applied to the local state (optimistic update)
- * - Waiting for server confirmation (unless it's a local mutation)
+ * - Waiting for server confirmation
  * - Will be rebased if server state changes
- *
- * Local mutations (isLocal: true):
- * - Applied locally but NOT sent to server
- * - Useful for UI-only state changes
- * - Filtered out from pendingMutations (use allMutations to see them)
  *
  * This is a discriminated union where the `input` type is strictly typed
  * based on the `name` field, enabling type-safe access to mutation data.
@@ -60,10 +72,9 @@ export type ServerSnapshot<T extends FullSchemaDefinition> = {
  *
  * const engine = sync(schema);
  * engine.mutate('createTodo', { id: '1', title: 'Test' });
- * engine.mutateLocal('deleteTodo', { id: '1' }); // Local-only
  *
  * // Type narrowing based on mutation name
- * for (const mutation of engine.allMutations) {
+ * for (const mutation of engine.pendingMutations) {
  *   if (mutation.name === 'createTodo') {
  *     // TypeScript knows: mutation.input is { id: string; title: string }
  *     console.log(mutation.input.title); // ✓ Type-safe
@@ -84,12 +95,6 @@ export type PendingMutation<T extends FullSchemaDefinition> = {
         readonly name: M;
         /** Input data for the mutation, strictly typed based on mutation name */
         readonly input: InferMutationInput<Schema<T>, M>;
-        /**
-         * Whether this is a local-only mutation
-         * - true: mutation is NOT sent to server, filtered from pendingMutations
-         * - false: mutation will be sent to server
-         */
-        readonly isLocal: boolean;
     }
 }[InferMutations<Schema<T>>];
 
@@ -110,7 +115,7 @@ type MutatorRegistry<T extends FullSchemaDefinition> = {
 };
 
 /**
- * Helper type to create a partial server update item
+ * Helper type to create a partial server update item for collections
  * Ensures version is required when versioned=true, prohibited when versioned=false
  */
 type PartialServerItem<T extends FullSchemaDefinition, TCollection extends keyof T['types']> =
@@ -121,13 +126,51 @@ type PartialServerItem<T extends FullSchemaDefinition, TCollection extends keyof
         : { id: string; version?: never } & Partial<Omit<InferItemState<Schema<T>, TCollection>, 'id'>>;
 
 /**
- * Partial server update - collections contain arrays of partial items
- * Each item must have an id, but other fields are optional
+ * Helper type to create a partial server update for singleton objects
+ * No id field, version required when versioned=true
+ */
+type PartialServerObject<T extends FullSchemaDefinition, TObject extends keyof T['types']> =
+    HasVersionTracking<Schema<T>, TObject> extends true
+        // When versioned=true: version is required
+        ? { version: number } & Partial<InferObjectState<Schema<T>, TObject>>
+        // When versioned=false: version is prohibited
+        : { version?: never } & Partial<InferObjectState<Schema<T>, TObject>>;
+
+/**
+ * Partial server update
+ * - Collections: arrays of partial items (each with id)
+ * - Singleton objects: single object (no id, direct fields)
  * Version is REQUIRED when versioned=true, PROHIBITED when versioned=false (compile-time checked)
  */
 export type PartialServerUpdate<T extends FullSchemaDefinition> = {
-    [K in keyof T['types']]?: Array<PartialServerItem<T, K>>
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType
+        ? PartialServerObject<T, K>  // Single object for singletons
+        : Array<PartialServerItem<T, K>>  // Array for collections
 };
+
+/**
+ * Options for rebase method to control which fields are updated
+ */
+export interface RebaseOptions {
+    /**
+     * Allow updating regular (server-synced) fields
+     * @default true
+     */
+    allowServerFields?: boolean;
+
+    /**
+     * Allow updating local (client-only) fields
+     * @default false
+     */
+    allowLocalFields?: boolean;
+
+    /**
+     * Skip full state rebase (don't reapply pending mutations)
+     * When true, only updates server snapshot without recomputing client state
+     * @default false
+     */
+    direct?: boolean;
+}
 
 /**
  * Sync engine instance returned by sync()
@@ -142,17 +185,9 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
     /**
      * List of pending mutations waiting for server confirmation
      * These mutations have been applied to local state but not yet confirmed
-     * Excludes local mutations (use allMutations to see all mutations)
      * Read-only array to prevent external modification
      */
     readonly pendingMutations: ReadonlyArray<PendingMutation<T>>;
-
-    /**
-     * List of ALL mutations including local and pending mutations
-     * Maintains insertion order
-     * Read-only array to prevent external modification
-     */
-    readonly allMutations: ReadonlyArray<PendingMutation<T>>;
 
     /**
      * Apply a mutation locally
@@ -160,17 +195,6 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
      * This mutation will be sent to the server
      */
     mutate<M extends InferMutations<Schema<T>>>(
-        name: M,
-        input: InferMutationInput<Schema<T>, M>
-    ): void;
-
-    /**
-     * Apply a local-only mutation
-     * Creates a mutation ID and timestamp, adds to mutations list, and rebases state
-     * This mutation is NOT sent to the server (filtered from pendingMutations)
-     * Useful for UI-only state changes
-     */
-    mutateLocal<M extends InferMutations<Schema<T>>>(
         name: M,
         input: InferMutationInput<Schema<T>, M>
     ): void;
@@ -200,9 +224,15 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
      * - If item exists: patches/merges fields into existing item
      * - If item is new and has all required fields: creates new item
      * - If item is new but missing required fields: ignores it
-     * - Automatically rebases pending mutations after update
+     * - Automatically rebases pending mutations after update (unless direct=true)
+     *
+     * @param partialServerUpdate - Partial data to merge into server snapshot
+     * @param options - Optional rebase configuration
+     * @param options.allowServerFields - Allow updating regular fields (default: true)
+     * @param options.allowLocalFields - Allow updating local fields (default: false)
+     * @param options.direct - Skip full state rebase (default: false)
      */
-    rebase(partialServerUpdate: PartialServerUpdate<T>): void;
+    rebase(partialServerUpdate: PartialServerUpdate<T>, options?: RebaseOptions): void;
 }
 
 /**
@@ -213,8 +243,17 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
     // Create empty initial state (client representation)
     const createEmptyState = (): SyncState<T> => {
         const emptyState = {} as SyncState<T>;
-        for (let collection of Object.keys(schema._schema.types)) {
-            emptyState[collection as keyof T['types']] = {};
+        for (let name of Object.keys(schema._schema.types)) {
+            const typeKey = name as keyof T['types'];
+            const typeDef = (schema._schema.types as Record<string, CollectionType | ObjectType>)[name];
+
+            if (typeDef._tag === 'ObjectType') {
+                // Singleton: initialize as empty object (will be populated on first rebase)
+                emptyState[typeKey] = {} as InferStateForType<T, typeof typeKey>;
+            } else {
+                // Collection: initialize as empty Record
+                emptyState[typeKey] = {} as InferStateForType<T, typeof typeKey>;
+            }
         }
         return emptyState;
     };
@@ -222,8 +261,17 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
     // Create empty initial server snapshot (server representation)
     const createEmptySnapshot = (): ServerSnapshot<T> => {
         const emptySnapshot = {} as ServerSnapshot<T>;
-        for (let collection of Object.keys(schema._schema.types)) {
-            (emptySnapshot as Record<string, Record<string, unknown>>)[collection] = {};
+        for (let name of Object.keys(schema._schema.types)) {
+            const typeKey = name as keyof T['types'];
+            const typeDef = (schema._schema.types as Record<string, CollectionType | ObjectType>)[name];
+
+            if (typeDef._tag === 'ObjectType') {
+                // Singleton: initialize as empty object
+                (emptySnapshot as Record<string, unknown>)[name] = {} as InferServerStateForType<T, typeof typeKey>;
+            } else {
+                // Collection: initialize as empty Record
+                (emptySnapshot as Record<string, Record<string, unknown>>)[name] = {};
+            }
         }
         return emptySnapshot;
     };
@@ -231,54 +279,74 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
     // Internal state
     let serverSnapshot: ServerSnapshot<T> = createEmptySnapshot();
     let state: SyncState<T> = createEmptyState();
-    // All mutations (both pending and local) in order
-    const allPendingMutations: PendingMutation<T>[] = [];
+    // Pending mutations waiting for server confirmation
+    const pendingMutations: PendingMutation<T>[] = [];
     const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;
 
     /**
      * Unwrap server snapshot to client state
      * Converts FieldValue<T> to plain T for all fields except id and version
+     * Handles both collections (key-indexed) and singletons (direct object)
      */
     const unwrapSnapshot = (snapshot: ServerSnapshot<T>): SyncState<T> => {
         const clientState = {} as SyncState<T>;
 
-        for (const collectionName in snapshot) {
-            const collectionKey = collectionName as keyof T['types'];
-            const serverItems = snapshot[collectionKey];
-            const clientItems: Record<string, unknown> = {};
+        for (const name in snapshot) {
+            const typeKey = name as keyof T['types'];
+            const typeDef = (schema._schema.types as Record<string, CollectionType | ObjectType>)[name];
 
-            for (const itemId in serverItems) {
-                const serverItem = serverItems[itemId] as Record<string, unknown>;
-                const clientItem: Record<string, unknown> = {
-                    id: serverItem.id, // id is not wrapped
-                };
+            if (typeDef._tag === 'ObjectType') {
+                // Singleton: unwrap directly (no iteration over items)
+                const serverObject = snapshot[typeKey] as Record<string, unknown>;
+                const clientObject: Record<string, unknown> = {};
 
-                // Unwrap all other fields (skip id and version)
-                for (const fieldName in serverItem) {
-                    if (fieldName === 'id' || fieldName === 'version') continue; // Skip unwrapped fields
+                // Unwrap all fields (skip version)
+                for (const fieldName in serverObject) {
+                    if (fieldName === 'version') continue; // Skip version field
 
-                    const fieldValue = serverItem[fieldName] as FieldValue<unknown>;
-                    clientItem[fieldName] = fieldValue.value;
+                    const fieldValue = serverObject[fieldName] as FieldValue<unknown>;
+                    clientObject[fieldName] = fieldValue.value;
                 }
 
-                clientItems[itemId] = clientItem;
-            }
+                clientState[typeKey] = clientObject as InferStateForType<T, typeof typeKey>;
+            } else {
+                // Collection: unwrap each item
+                const serverItems = snapshot[typeKey] as Record<string, unknown>;
+                const clientItems: Record<string, unknown> = {};
 
-            clientState[collectionKey] = clientItems as Record<string, InferItemState<Schema<T>, typeof collectionKey>>;
+                for (const itemId in serverItems) {
+                    const serverItem = serverItems[itemId] as Record<string, unknown>;
+                    const clientItem: Record<string, unknown> = {
+                        id: serverItem.id, // id is not wrapped
+                    };
+
+                    // Unwrap all other fields (skip id and version)
+                    for (const fieldName in serverItem) {
+                        if (fieldName === 'id' || fieldName === 'version') continue; // Skip unwrapped fields
+
+                        const fieldValue = serverItem[fieldName] as FieldValue<unknown>;
+                        clientItem[fieldName] = fieldValue.value;
+                    }
+
+                    clientItems[itemId] = clientItem;
+                }
+
+                clientState[typeKey] = clientItems as InferStateForType<T, typeof typeKey>;
+            }
         }
 
         return clientState;
     };
 
     /**
-     * Rebase state by applying ALL mutations (including local) to unwrapped server state
+     * Rebase state by applying all pending mutations to unwrapped server state
      */
     const rebaseState = (): void => {
         // Start with unwrapped server snapshot
         const baseState = unwrapSnapshot(serverSnapshot);
 
-        // Apply all mutations on top
-        state = allPendingMutations.reduce(
+        // Apply all pending mutations on top
+        state = pendingMutations.reduce(
             (currentState, mutation) => {
                 const mutator = mutators[mutation.name];
                 if (!mutator) {
@@ -293,6 +361,253 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
         );
     };
 
+    /**
+     * Apply partial update to a state representation (server snapshot or client state)
+     * @param target - State to update (server snapshot with FieldValue wrappers, or client state with plain values)
+     * @param partialUpdate - Incoming changes to apply
+     * @param wrapped - If true, wrap values in FieldValue and apply LWW (for server snapshot). If false, use plain values (for client state)
+     * @param allowServerFields - Whether to update server fields
+     * @param allowLocalFields - Whether to update local fields
+     */
+    const applyPartialUpdate = <TTarget extends ServerSnapshot<T> | SyncState<T>>(
+        target: TTarget,
+        partialUpdate: PartialServerUpdate<T>,
+        wrapped: boolean,
+        allowServerFields: boolean,
+        allowLocalFields: boolean
+    ): TTarget => {
+        // Helper to check if an item has all required fields defined
+        const isComplete = (item: Record<string, unknown>, collectionName: string): boolean => {
+            const collectionFields = schema.collection(collectionName as keyof T['types']);
+            if (!collectionFields) return false;
+
+            if (item.id === undefined) return false;
+
+            for (const fieldName in collectionFields) {
+                const field = collectionFields[fieldName];
+                if (field.fieldType === 'local') continue;
+                if (item[fieldName] === undefined) return false;
+            }
+
+            return true;
+        };
+
+        return produce(target, draft => {
+            for (const name in partialUpdate) {
+                const typeKey = name as keyof T['types'];
+                const partialData = partialUpdate[typeKey];
+                if (!partialData) continue;
+
+                const typeDef = (schema._schema.types as Record<string, CollectionType | ObjectType>)[name];
+                const typeFields = schema.collection(typeKey);
+                const versioned = typeDef.versioned;
+
+                if (typeDef._tag === 'ObjectType') {
+                    // Singleton object
+                    const partialObject = partialData as Record<string, unknown>;
+                    const singletonObject = (draft as Record<string, Record<string, unknown>>)[name];
+
+                    const incomingVersion = versioned && 'version' in partialObject
+                        ? partialObject.version as number
+                        : 0;
+
+                    const exists = Object.keys(singletonObject).length > 0;
+
+                    if (exists) {
+                        // Patch existing singleton
+                        for (const fieldName in partialObject) {
+                            if (fieldName === 'version') continue;
+
+                            const field = typeFields?.[fieldName];
+                            const isLocal = field?.fieldType === 'local';
+
+                            if (isLocal && !allowLocalFields) continue;
+                            if (!isLocal && !allowServerFields) continue;
+
+                            if (wrapped) {
+                                // Server snapshot: wrapped values with LWW
+                                const incomingValue = partialObject[fieldName];
+                                const fieldVersion = incomingVersion;
+                                const existingField = singletonObject[fieldName] as FieldValue<unknown> | undefined;
+
+                                if (existingField && versioned && fieldVersion > 0) {
+                                    if (fieldVersion > existingField.version) {
+                                        singletonObject[fieldName] = {
+                                            value: incomingValue,
+                                            version: fieldVersion,
+                                        };
+                                    }
+                                } else {
+                                    singletonObject[fieldName] = {
+                                        value: incomingValue,
+                                        version: fieldVersion,
+                                    };
+                                }
+                            } else {
+                                // Client state: plain values
+                                singletonObject[fieldName] = partialObject[fieldName];
+                            }
+                        }
+
+                        if (wrapped && versioned && incomingVersion > 0) {
+                            const currentVersion = singletonObject.version as number || 0;
+                            if (incomingVersion > currentVersion) {
+                                singletonObject.version = incomingVersion;
+                            }
+                        }
+                    } else {
+                        // Create new singleton
+                        if (versioned) {
+                            singletonObject.version = incomingVersion;
+                        }
+
+                        for (const fieldName in partialObject) {
+                            if (fieldName === 'version') continue;
+
+                            const field = typeFields?.[fieldName];
+                            const isLocal = field?.fieldType === 'local';
+
+                            if (isLocal && !allowLocalFields) {
+                                singletonObject[fieldName] = {
+                                    value: field.defaultValue,
+                                    version: 0,
+                                };
+                            } else if (!isLocal && !allowServerFields) {
+                                continue;
+                            } else if (isLocal && allowLocalFields) {
+                                singletonObject[fieldName] = {
+                                    value: partialObject[fieldName],
+                                    version: 0,
+                                };
+                            } else {
+                                singletonObject[fieldName] = {
+                                    value: partialObject[fieldName],
+                                    version: incomingVersion,
+                                };
+                            }
+                        }
+
+                        // Add local fields that weren't in the partial object
+                        for (const fieldName in typeFields) {
+                            const field = typeFields[fieldName];
+                            if (field.fieldType === 'local' && !(fieldName in partialObject)) {
+                                singletonObject[fieldName] = {
+                                    value: field.defaultValue,
+                                    version: 0,
+                                };
+                            }
+                        }
+                    }
+                } else {
+                    // Collection
+                    const partialItems = partialData as Array<Record<string, unknown>>;
+                    const collection = (draft as Record<string, Record<string, unknown>>)[name];
+
+                    for (const partialItem of partialItems) {
+                        const itemId = partialItem.id as string;
+                        const existingItem = collection[itemId] as Record<string, unknown> | undefined;
+
+                        const incomingVersion = versioned && 'version' in partialItem
+                            ? partialItem.version as number
+                            : 0;
+
+                        if (existingItem) {
+                            // Patch existing item
+                            for (const fieldName in partialItem) {
+                                if (fieldName === 'id' || fieldName === 'version') continue;
+
+                                const field = typeFields?.[fieldName];
+                                const isLocal = field?.fieldType === 'local';
+
+                                if (isLocal && !allowLocalFields) continue;
+                                if (!isLocal && !allowServerFields) continue;
+
+                                if (wrapped) {
+                                    // Server snapshot: wrapped values with LWW
+                                    const incomingValue = partialItem[fieldName];
+                                    const fieldVersion = incomingVersion;
+                                    const existingField = existingItem[fieldName] as FieldValue<unknown> | undefined;
+
+                                    if (existingField && versioned && fieldVersion > 0) {
+                                        if (fieldVersion > existingField.version) {
+                                            existingItem[fieldName] = {
+                                                value: incomingValue,
+                                                version: fieldVersion,
+                                            };
+                                        }
+                                    } else {
+                                        existingItem[fieldName] = {
+                                            value: incomingValue,
+                                            version: fieldVersion,
+                                        };
+                                    }
+                                } else {
+                                    // Client state: plain values
+                                    existingItem[fieldName] = partialItem[fieldName];
+                                }
+                            }
+
+                            if (wrapped && versioned && incomingVersion > 0) {
+                                const currentVersion = existingItem.version as number || 0;
+                                if (incomingVersion > currentVersion) {
+                                    existingItem.version = incomingVersion;
+                                }
+                            }
+                        } else if (isComplete(partialItem, name)) {
+                            // Create new item
+                            const newItem: Record<string, unknown> = {
+                                id: itemId,
+                            };
+
+                            if (versioned) {
+                                newItem.version = incomingVersion;
+                            }
+
+                            for (const fieldName in partialItem) {
+                                if (fieldName === 'id' || fieldName === 'version') continue;
+
+                                const field = typeFields?.[fieldName];
+                                const isLocal = field?.fieldType === 'local';
+
+                                if (isLocal && !allowLocalFields) {
+                                    newItem[fieldName] = {
+                                        value: field.defaultValue,
+                                        version: 0,
+                                    };
+                                } else if (!isLocal && !allowServerFields) {
+                                    continue;
+                                } else if (isLocal && allowLocalFields) {
+                                    newItem[fieldName] = {
+                                        value: partialItem[fieldName],
+                                        version: 0,
+                                    };
+                                } else {
+                                    newItem[fieldName] = {
+                                        value: partialItem[fieldName],
+                                        version: incomingVersion,
+                                    };
+                                }
+                            }
+
+                            // Add local fields that weren't in the partial item
+                            for (const fieldName in typeFields) {
+                                const field = typeFields[fieldName];
+                                if (field.fieldType === 'local' && !(fieldName in partialItem)) {
+                                    newItem[fieldName] = {
+                                        value: field.defaultValue,
+                                        version: 0,
+                                    };
+                                }
+                            }
+
+                            collection[itemId] = newItem;
+                        }
+                    }
+                }
+            }
+        }) as TTarget;
+    };
+
     return {
         get state() {
             return state;
@@ -304,13 +619,8 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
         },
 
         get pendingMutations() {
-            // Filter out local mutations and return readonly copy
-            return allPendingMutations.filter(m => !m.isLocal) as ReadonlyArray<PendingMutation<T>>;
-        },
-
-        get allMutations() {
-            // Return all mutations including local
-            return allPendingMutations as ReadonlyArray<PendingMutation<T>>;
+            // Return readonly copy of pending mutations
+            return pendingMutations as ReadonlyArray<PendingMutation<T>>;
         },
 
         mutate(name, input) {
@@ -320,28 +630,10 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                 timestamp: Date.now(),
                 name: name as InferMutations<Schema<T>>,
                 input,
-                isLocal: false,
             };
 
             // Add to mutations list
-            allPendingMutations.push(mutation);
-
-            // Rebase state
-            rebaseState();
-        },
-
-        mutateLocal(name, input) {
-            // Create local mutation metadata
-            const mutation: PendingMutation<T> = {
-                id: createId(),
-                timestamp: Date.now(),
-                name: name as InferMutations<Schema<T>>,
-                input,
-                isLocal: true,
-            };
-
-            // Add to mutations list (same array to maintain order)
-            allPendingMutations.push(mutation);
+            pendingMutations.push(mutation);
 
             // Rebase state
             rebaseState();
@@ -359,162 +651,51 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
             const idsSet = new Set(idsToCommit);
 
             // Filter out committed mutations
-            const originalLength = allPendingMutations.length;
-            let i = allPendingMutations.length;
+            const originalLength = pendingMutations.length;
+            let i = pendingMutations.length;
             while (i--) {
-                if (idsSet.has(allPendingMutations[i].id)) {
-                    allPendingMutations.splice(i, 1);
+                if (idsSet.has(pendingMutations[i].id)) {
+                    pendingMutations.splice(i, 1);
                 }
             }
 
             // Only rebase if we actually removed something
-            if (allPendingMutations.length !== originalLength) {
+            if (pendingMutations.length !== originalLength) {
                 rebaseState();
             }
         },
 
-        rebase(partialServerUpdate) {
-            // Helper to check if an item has all required fields defined
-            // Local fields are NOT required from server (they use defaults)
-            const isComplete = (item: Record<string, unknown>, collectionName: string): boolean => {
-                const collectionFields = schema.collection(collectionName as keyof T['types']);
-                if (!collectionFields) return false;
+        rebase(partialServerUpdate, options) {
+            // Destructure options with defaults
+            const {
+                allowServerFields = true,
+                allowLocalFields = false,
+                direct = false,
+            } = options ?? {};
 
-                // Check id and createdAt
-                if (item.id === undefined || item.createdAt === undefined) {
-                    return false;
-                }
+            // Update server snapshot (wrapped values with LWW)
+            serverSnapshot = applyPartialUpdate(
+                serverSnapshot,
+                partialServerUpdate,
+                true,  // wrapped
+                allowServerFields,
+                allowLocalFields
+            );
 
-                // Check all schema-defined fields (except local fields)
-                for (const fieldName in collectionFields) {
-                    const field = collectionFields[fieldName];
-                    // Skip local fields - they use default values
-                    if (field.fieldType === 'local') continue;
-
-                    if (item[fieldName] === undefined) {
-                        return false;
-                    }
-                }
-
-                return true;
-            };
-
-            // Merge partial server update into server snapshot with per-object versioning and field-level LWW
-            serverSnapshot = produce(serverSnapshot, draft => {
-                for (const collectionName in partialServerUpdate) {
-                    const collectionKey = collectionName as keyof T['types'];
-                    const partialItems = partialServerUpdate[collectionKey];
-                    if (!partialItems) continue;
-
-                    // TypeScript struggles with generic indexing in Immer drafts
-                    const collection = (draft as Record<string, Record<string, unknown>>)[collectionName];
-                    const collectionFields = schema.collection(collectionKey);
-                    const collectionType = (schema._schema.types as Record<string, CollectionType>)[collectionName];
-                    const versioned = collectionType.versioned;
-
-                    for (const partialItem of partialItems) {
-                        const itemId = partialItem.id;
-                        const existingItem = collection[itemId] as Record<string, unknown> | undefined;
-
-                        // Get incoming version (if provided and tracking enabled)
-                        const incomingVersion = versioned && 'version' in partialItem
-                            ? (partialItem as Record<string, unknown>).version as number
-                            : 0;
-
-                        if (existingItem) {
-                            // Item exists: merge fields using LWW if enabled
-                            for (const fieldName in partialItem) {
-                                if (fieldName === 'id' || fieldName === 'version') continue; // Skip id and version
-
-                                const field = collectionFields?.[fieldName];
-                                // Skip local fields - they're client-side only
-                                if (field?.fieldType === 'local') continue;
-
-                                const incomingValue = (partialItem as Record<string, unknown>)[fieldName];
-
-                                // For fields, use incoming version (object version)
-                                const fieldVersion = incomingVersion;
-
-                                // Regular field - wrap it
-                                const existingField = existingItem[fieldName] as FieldValue<unknown> | undefined;
-
-                                if (existingField && versioned && fieldVersion > 0) {
-                                    // LWW: compare versions, keep most recent
-                                    if (fieldVersion > existingField.version) {
-                                        existingItem[fieldName] = {
-                                            value: incomingValue,
-                                            version: fieldVersion,
-                                        };
-                                    }
-                                } else {
-                                    // No existing field or no tracking - just set it
-                                    existingItem[fieldName] = {
-                                        value: incomingValue,
-                                        version: fieldVersion,
-                                    };
-                                }
-                            }
-
-                            // Update object version if tracking enabled and new version provided
-                            if (versioned && incomingVersion > 0) {
-                                const currentVersion = existingItem.version as number || 0;
-                                if (incomingVersion > currentVersion) {
-                                    existingItem.version = incomingVersion;
-                                }
-                            }
-                        } else {
-                            // Item doesn't exist: create if complete
-                            if (isComplete(partialItem as Record<string, unknown>, collectionName)) {
-                                const newItem: Record<string, unknown> = {
-                                    id: itemId, // id is not wrapped
-                                };
-
-                                // Add version field if versioning enabled
-                                if (versioned) {
-                                    newItem.version = incomingVersion;
-                                }
-
-                                // Wrap all fields (except id and version)
-                                for (const fieldName in partialItem) {
-                                    if (fieldName === 'id' || fieldName === 'version') continue;
-
-                                    const field = collectionFields?.[fieldName];
-                                    if (field?.fieldType === 'local') {
-                                        // Initialize local field with default value (wrapped)
-                                        newItem[fieldName] = {
-                                            value: field.defaultValue,
-                                            version: 0, // Local fields always have version = 0
-                                        };
-                                    } else {
-                                        // Wrap regular field with object version
-                                        newItem[fieldName] = {
-                                            value: (partialItem as Record<string, unknown>)[fieldName],
-                                            version: incomingVersion,
-                                        };
-                                    }
-                                }
-
-                                // Add local fields that weren't in the partial item
-                                for (const fieldName in collectionFields) {
-                                    const field = collectionFields[fieldName];
-                                    if (field.fieldType === 'local' && !(fieldName in partialItem)) {
-                                        newItem[fieldName] = {
-                                            value: field.defaultValue,
-                                            version: 0,
-                                        };
-                                    }
-                                }
-
-                                (collection as Record<string, unknown>)[itemId] = newItem;
-                            }
-                            // Otherwise ignore incomplete items
-                        }
-                    }
-                }
-            }) as ServerSnapshot<T>;
-
-            // Rebase client state with new server snapshot
-            rebaseState();
+            // Update client state based on mode
+            if (!direct) {
+                // Normal mode: full rebase (unwrap + reapply mutations)
+                rebaseState();
+            } else {
+                // Direct mode: patch client state directly (plain values, no mutation reapplication)
+                state = applyPartialUpdate(
+                    state,
+                    partialServerUpdate,
+                    false, // unwrapped (plain values)
+                    allowServerFields,
+                    allowLocalFields
+                );
+            }
         },
     };
 }

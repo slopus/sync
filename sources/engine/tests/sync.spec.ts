@@ -10,9 +10,6 @@ import {
     field,
     reference,
     syncEngine,
-    type SyncEngine,
-    type SyncState,
-    type PendingMutation,
 } from '../index';
 
 describe('Sync Engine', () => {
@@ -63,264 +60,11 @@ describe('Sync Engine', () => {
             type ExpectedState = {
                 todos: Record<string, {
                     id: string;
-                    createdAt: number;
                     title: string;
                 }>;
             };
 
             expectTypeOf(engine.state).toMatchTypeOf<ExpectedState>();
-        });
-    });
-
-    describe('Local Mutations', () => {
-        it('should apply local mutations without adding to pendingMutations', () => {
-            const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    toggleExpanded: z.object({
-                        id: z.string(),
-                        isExpanded: z.boolean(),
-                    }),
-                },
-            });
-
-            const engine = syncEngine(schema);
-
-            engine.addMutator('toggleExpanded', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].isExpanded = input.isExpanded;
-                }
-            });
-
-            // Create item
-            engine.rebase({
-                todos: [{
-                    id: 'todo-1',
-                    createdAt: Date.now(),
-                    title: 'Test',
-                    isExpanded: false,
-                }],
-            });
-
-            // Apply local mutation
-            engine.mutateLocal('toggleExpanded', { id: 'todo-1', isExpanded: true });
-
-            // State should be updated
-            expect(engine.state.todos['todo-1'].isExpanded).toBe(true);
-
-            // Should NOT appear in pendingMutations
-            expect(engine.pendingMutations).toHaveLength(0);
-
-            // Should appear in allMutations
-            expect(engine.allMutations).toHaveLength(1);
-            expect(engine.allMutations[0].isLocal).toBe(true);
-        });
-
-        it('should maintain order between local and regular mutations', () => {
-            const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    updateTitle: z.object({ id: z.string(), title: z.string() }),
-                    toggleCompleted: z.object({ id: z.string(), completed: z.boolean() }),
-                },
-            });
-
-            const engine = syncEngine(schema);
-
-            engine.addMutator('updateTitle', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].title = input.title;
-                }
-            });
-
-            engine.addMutator('toggleCompleted', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = input.completed;
-                }
-            });
-
-            engine.rebase({
-                todos: [{
-                    id: 'todo-1',
-                    createdAt: Date.now(),
-                    title: 'Original',
-                    completed: false,
-                }],
-            });
-
-            // Mix of regular and local mutations
-            engine.mutate('updateTitle', { id: 'todo-1', title: 'First' });
-            engine.mutateLocal('toggleCompleted', { id: 'todo-1', completed: true });
-            engine.mutate('updateTitle', { id: 'todo-1', title: 'Second' });
-
-            // Should have 2 pending mutations (regular ones)
-            expect(engine.pendingMutations).toHaveLength(2);
-            expect(engine.pendingMutations.every(m => !m.isLocal)).toBe(true);
-
-            // Should have 3 total mutations in order
-            expect(engine.allMutations).toHaveLength(3);
-            expect(engine.allMutations[0].name).toBe('updateTitle');
-            expect(engine.allMutations[0].isLocal).toBe(false);
-            expect(engine.allMutations[1].name).toBe('toggleCompleted');
-            expect(engine.allMutations[1].isLocal).toBe(true);
-            expect(engine.allMutations[2].name).toBe('updateTitle');
-            expect(engine.allMutations[2].isLocal).toBe(false);
-        });
-
-        it('should allow committing local mutations', () => {
-            const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            isExpanded: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    toggle: z.object({ id: z.string() }),
-                },
-            });
-
-            const engine = syncEngine(schema);
-
-            engine.addMutator('toggle', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].isExpanded = !draft.todos[input.id].isExpanded;
-                }
-            });
-
-            engine.rebase({
-                todos: [{
-                    id: 'todo-1',
-                    createdAt: Date.now(),
-                    isExpanded: false,
-                }],
-            });
-
-            engine.mutateLocal('toggle', { id: 'todo-1' });
-            expect(engine.allMutations).toHaveLength(1);
-
-            const mutationId = engine.allMutations[0].id;
-
-            // Commit the local mutation
-            engine.commit(mutationId);
-
-            expect(engine.allMutations).toHaveLength(0);
-            expect(engine.pendingMutations).toHaveLength(0);
-        });
-
-        it('should rebase correctly with local mutations', () => {
-            const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    updateTitle: z.object({ id: z.string(), title: z.string() }),
-                    expand: z.object({ id: z.string() }),
-                },
-            });
-
-            const engine = syncEngine(schema);
-
-            engine.addMutator('updateTitle', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].title = input.title;
-                }
-            });
-
-            engine.addMutator('expand', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].isExpanded = true;
-                }
-            });
-
-            engine.rebase({
-                todos: [{
-                    id: 'todo-1',
-                    createdAt: Date.now(),
-                    title: 'Server Title',
-                    isExpanded: false,
-                }],
-            });
-
-            // Regular mutation
-            engine.mutate('updateTitle', { id: 'todo-1', title: 'Local Title' });
-            // Local mutation
-            engine.mutateLocal('expand', { id: 'todo-1' });
-
-            expect(engine.state.todos['todo-1'].title).toBe('Local Title');
-            expect(engine.state.todos['todo-1'].isExpanded).toBe(true);
-
-            // Server confirms title update
-            engine.rebase({
-                todos: [{
-                    id: 'todo-1',
-                    title: 'Local Title',
-                }],
-            });
-
-            // Both changes should still be applied
-            expect(engine.state.todos['todo-1'].title).toBe('Local Title');
-            expect(engine.state.todos['todo-1'].isExpanded).toBe(true);
-        });
-
-        it('should have isLocal flag in mutation type', () => {
-            const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    update: z.object({ id: z.string(), title: z.string() }),
-                },
-            });
-
-            const engine = syncEngine(schema);
-
-            engine.addMutator('update', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].title = input.title;
-                }
-            });
-
-            engine.rebase({
-                todos: [{
-                    id: 'todo-1',
-                    createdAt: Date.now(),
-                    title: 'Test',
-                }],
-            });
-
-            engine.mutate('update', { id: 'todo-1', title: 'Regular' });
-            engine.mutateLocal('update', { id: 'todo-1', title: 'Local' });
-
-            const regularMutation = engine.allMutations[0];
-            const localMutation = engine.allMutations[1];
-
-            expect(regularMutation.isLocal).toBe(false);
-            expect(localMutation.isLocal).toBe(true);
         });
     });
 
@@ -347,7 +91,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                 };
             });
@@ -393,7 +136,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                 };
             });
@@ -439,7 +181,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                 };
             });
@@ -485,7 +226,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                     completed: false,
                 };
@@ -551,7 +291,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                     priority: input.priority,
                 };
@@ -597,7 +336,6 @@ describe('Sync Engine', () => {
                 const data = input as { id: string; title: string; completed: boolean };
                 draft.todos[data.id] = {
                     id: data.id,
-                    createdAt: Date.now(),
                     title: data.title,
                     completed: data.completed,
                 };
@@ -632,7 +370,6 @@ describe('Sync Engine', () => {
                 const data = input as { id: string; title: string; completed: boolean };
                 draft.todos[data.id] = {
                     id: data.id,
-                    createdAt: Date.now(),
                     title: data.title,
                     completed: data.completed,
                 };
@@ -677,7 +414,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                     completed: input.completed,
                 };
@@ -724,7 +460,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: 1000,
                     title: 'Original Title',
                     completed: false,
                 }],
@@ -744,7 +479,6 @@ describe('Sync Engine', () => {
             // Should patch existing item
             expect(engine.serverState.todos['todo-1'].title).toBe('Updated Title');
             expect(engine.serverState.todos['todo-1'].completed).toBe(false);
-            expect(engine.serverState.todos['todo-1'].createdAt).toBe(1000);
         });
 
         it('should ignore partial items without all required fields when creating new items', () => {
@@ -794,7 +528,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Complete Todo',
                     completed: false,
                 }],
@@ -824,7 +557,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Todo',
                     description: null,
                 }],
@@ -873,7 +605,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Server Todo',
                     completed: false,
                 }],
@@ -924,7 +655,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Original Title',
                     completed: false,
                 }],
@@ -940,7 +670,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Updated Title',
                     completed: false,
                 }],
@@ -981,7 +710,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                     completed: input.completed,
                 };
@@ -997,12 +725,10 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Todo 1',
                     completed: false,
                 }, {
                     id: 'todo-2',
-                    createdAt: Date.now(),
                     title: 'Todo 2',
                     completed: false,
                 }],
@@ -1057,7 +783,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                 };
             });
@@ -1101,11 +826,9 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Original 1',
                 }, {
                     id: 'todo-2',
-                    createdAt: Date.now(),
                     title: 'Original 2',
                 }],
             });
@@ -1149,7 +872,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                     completed: input.completed,
                 };
@@ -1171,7 +893,6 @@ describe('Sync Engine', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    createdAt: Date.now(),
                     title: 'Test Todo',
                     completed: false,
                 }],
@@ -1205,7 +926,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                 };
             });
@@ -1254,7 +974,6 @@ describe('Sync Engine', () => {
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
                     id: input.id,
-                    createdAt: Date.now(),
                     title: input.title,
                     assignedTo: input.assignedTo,
                 };

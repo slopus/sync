@@ -156,7 +156,7 @@ export function reference<TCollection extends string, TNullable extends boolean 
 /**
  * Reserved field names that cannot be used in schema definitions
  */
-type ReservedFieldNames = 'id' | 'createdAt' | 'updatedAt';
+type ReservedFieldNames = 'id';
 
 /**
  * Helper type to check if any keys in an object are reserved
@@ -164,7 +164,7 @@ type ReservedFieldNames = 'id' | 'createdAt' | 'updatedAt';
  */
 type ValidateNoReservedFields<T> = keyof T & ReservedFieldNames extends never
     ? T
-    : { error: `Reserved field names (${keyof T & ReservedFieldNames & string}) cannot be used. Reserved: id, createdAt, updatedAt` };
+    : { error: `Reserved field names (${keyof T & ReservedFieldNames & string}) cannot be used. Reserved: id` };
 
 /**
  * Schema for a single collection
@@ -238,11 +238,77 @@ export function type<TFields extends CollectionSchema>(
 }
 
 /**
+ * Object type definition for a singleton instance
+ * Unlike CollectionType, represents a single instance without key indexing
+ * Generic over TVersioned to preserve literal true/false type for compile-time checks
+ */
+export interface ObjectType<
+    TFields extends CollectionSchema = CollectionSchema,
+    TVersioned extends boolean = boolean
+> {
+    readonly _tag: 'ObjectType';
+    readonly fields: TFields;
+    /**
+     * Whether to track versions for fields in this object
+     * - true: Field-level LWW conflict resolution enabled
+     * - false (default): Simple overwrite, all versions are 0
+     */
+    readonly versioned: TVersioned;
+}
+
+/**
+ * Define a singleton object type with field definitions
+ * Validates that no reserved field names are used
+ * Accessed directly without key indexing (e.g., state.settings vs state.todos['id'])
+ *
+ * @param config.fields - Field definitions for the object
+ * @param config.versioned - Whether to track field-level versions (default: false)
+ *
+ * @example
+ * const schema = defineSchema({
+ *   types: {
+ *     settings: object({
+ *       fields: {
+ *         theme: field<string>(),
+ *         fontSize: field<number>(),
+ *       },
+ *       versioned: true  // Enable LWW conflict resolution
+ *     })
+ *   }
+ * });
+ */
+export function object<TFields extends CollectionSchema>(
+    config: {
+        fields: ValidateNoReservedFields<TFields>;
+        versioned: true;
+    }
+): ObjectType<TFields, true>;
+
+export function object<TFields extends CollectionSchema>(
+    config: {
+        fields: ValidateNoReservedFields<TFields>;
+    }
+): ObjectType<TFields, false>;
+
+export function object<TFields extends CollectionSchema>(
+    config: {
+        fields: ValidateNoReservedFields<TFields>;
+        versioned?: true;
+    }
+): ObjectType<TFields, boolean> {
+    return {
+        _tag: 'ObjectType',
+        fields: config.fields as TFields,
+        versioned: (config.versioned ?? false) as boolean,
+    };
+}
+
+/**
  * Complete schema definition
- * Maps collection names to their type definitions
+ * Maps names to their type definitions (collections or singleton objects)
  */
 export type SchemaDefinition = {
-    [collectionName: string]: CollectionType;
+    [name: string]: CollectionType | ObjectType;
 };
 
 // ============================================================================
@@ -370,9 +436,13 @@ export type ExtractSchemaDefinition<T> = T extends Schema<infer S>
 export type InferCollections<TSchema> = keyof ExtractSchemaDefinition<TSchema>;
 
 /**
- * Helper type to extract CollectionSchema fields from a collection type
+ * Helper type to extract CollectionSchema fields from a collection or object type
  */
-type ExtractFields<T> = T extends CollectionType<infer TFields> ? TFields : never;
+type ExtractFields<T> = T extends CollectionType<infer TFields>
+    ? TFields
+    : T extends ObjectType<infer TFields>
+        ? TFields
+        : never;
 
 /**
  * Helper to infer the value type for a field in Create/Update
@@ -471,7 +541,6 @@ type InferItemField<TField> =
  *
  * Returns an object with:
  * - id: string (auto-added)
- * - createdAt: number (auto-added immutable)
  * - Mutable fields as { value: T, version: number }
  * - Immutable fields as plain values
  * - Reference fields as string (or string | null if nullable)
@@ -480,7 +549,6 @@ type InferItemField<TField> =
  * type Todo = InferItem<typeof schema, 'todos'>;
  * // {
  * //   id: string;
- * //   createdAt: number;
  * //   title: { value: string; version: number };
  * //   completed: { value: boolean; version: number };
  * //   priority: number;
@@ -489,7 +557,6 @@ type InferItemField<TField> =
  */
 export type InferItem<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
     id: string;
-    createdAt: number;
 } & {
     [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>]: InferItemField<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
 }>;
@@ -499,7 +566,6 @@ export type InferItem<TSchema, TCollection extends keyof ExtractSchemaDefinition
  *
  * Returns an object with:
  * - id: string (auto-added)
- * - createdAt: number (auto-added immutable)
  * - All fields as plain values (no { value, version } wrapping)
  * - Mutable fields as plain values
  * - Immutable fields as plain values
@@ -512,7 +578,6 @@ export type InferItem<TSchema, TCollection extends keyof ExtractSchemaDefinition
  * type TodoState = InferItemState<typeof schema, 'todos'>;
  * // {
  * //   id: string;
- * //   createdAt: number;
  * //   title: string;
  * //   completed: boolean;
  * //   priority: number;
@@ -521,7 +586,6 @@ export type InferItem<TSchema, TCollection extends keyof ExtractSchemaDefinition
  */
 export type InferItemState<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
     id: string;
-    createdAt: number;
 } & {
     [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>]: InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
 }>;
@@ -578,7 +642,6 @@ type ConditionalVersionField<TSchema, TCollection extends keyof ExtractSchemaDef
  * // {
  * //   id: string;
  * //   version: number;
- * //   createdAt: FieldValue<number>;
  * //   title: FieldValue<string>;
  * //   completed: FieldValue<boolean>;
  * // }
@@ -587,16 +650,59 @@ type ConditionalVersionField<TSchema, TCollection extends keyof ExtractSchemaDef
  * type SettingsServerState = InferServerItemState<typeof schema, 'settings'>;
  * // {
  * //   id: string;
- * //   createdAt: FieldValue<number>;
  * //   theme: FieldValue<string>;
  * // }
  */
 export type InferServerItemState<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
     id: string;
-    createdAt: FieldValue<number>;
 } & ConditionalVersionField<TSchema, TCollection> & {
     [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>]: InferServerField<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
 }>;
+
+// ============================================================================
+// Singleton Object Type Inference
+// ============================================================================
+
+/**
+ * Infer the plain state type for a singleton object (no id field)
+ *
+ * Returns an object with:
+ * - All fields as plain values (no { value, version } wrapping)
+ * - No id field (singleton doesn't need one)
+ *
+ * @example
+ * type SettingsState = InferObjectState<typeof schema, 'settings'>;
+ * // {
+ * //   theme: string;
+ * //   fontSize: number;
+ * // }
+ */
+export type InferObjectState<TSchema, TObject extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TObject]>]: InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TObject]>[K]>;
+}>;
+
+/**
+ * Infer the server-side state type for a singleton object (no id field)
+ *
+ * Returns an object with:
+ * - version: number (only when versioned = true for the object)
+ * - All fields wrapped as { value: T, version: number }
+ * - No id field (singleton doesn't need one)
+ *
+ * @example
+ * // With versioned = true
+ * type SettingsServerState = InferServerObjectState<typeof schema, 'settings'>;
+ * // {
+ * //   version: number;
+ * //   theme: FieldValue<string>;
+ * //   fontSize: FieldValue<number>;
+ * // }
+ */
+export type InferServerObjectState<TSchema, TObject extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<
+    ConditionalVersionField<TSchema, TObject> & {
+        [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TObject]>]: InferServerField<ExtractFields<ExtractSchemaDefinition<TSchema>[TObject]>[K]>;
+    }
+>;
 
 /**
  * Helper type to extract all field values from a collection schema
@@ -620,7 +726,6 @@ type DenormalizedVersion<TSchema extends CollectionSchema> = {
  *
  * Returns a flat object with:
  * - id: string (auto-added)
- * - createdAt: number (auto-added immutable)
  * - Mutable fields as two properties: field and fieldVersion
  * - Immutable fields as single property
  * - Reference fields as single property (string or string | null)
@@ -629,7 +734,6 @@ type DenormalizedVersion<TSchema extends CollectionSchema> = {
  * type TodoDenorm = InferDenormalized<typeof schema, 'todos'>;
  * // {
  * //   id: string;
- * //   createdAt: number;
  * //   title: string;
  * //   titleVersion: number;
  * //   completed: boolean;
@@ -641,7 +745,6 @@ type DenormalizedVersion<TSchema extends CollectionSchema> = {
 export type InferDenormalized<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<
     {
         id: string;
-        createdAt: number;
     } & DenormalizedValues<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>>
       & DenormalizedVersion<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>>
 >;

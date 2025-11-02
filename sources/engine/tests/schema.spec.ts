@@ -130,33 +130,7 @@ describe('Schema DSL', () => {
                 },
             });
 
-            const schema2 = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            // @ts-expect-error - createdAt is a reserved field name
-                            createdAt: field<number>(),
-                            title: field<string>(),
-                        },
-                    }),
-                },
-            });
-
-            const schema3 = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            // @ts-expect-error - updatedAt is a reserved field name
-                            updatedAt: field<number>(),
-                            title: field<string>(),
-                        },
-                    }),
-                },
-            });
-
             expect(schema1).toBeDefined();
-            expect(schema2).toBeDefined();
-            expect(schema3).toBeDefined();
         });
     });
 
@@ -195,7 +169,7 @@ describe('Schema DSL', () => {
             expect(validCreate).toBeDefined();
         });
 
-        it('should require id and not include createdAt in create type', () => {
+        it('should require id in create type', () => {
             const schema = defineSchema({
                 types: {
                     users: type({
@@ -211,11 +185,7 @@ describe('Schema DSL', () => {
             // id is required
             const valid: CreateUser = { id: '123', name: 'Alice' };
 
-            // @ts-expect-error - createdAt should not be present
-            const invalid: CreateUser = { id: '123', name: 'Alice', createdAt: 123 };
-
             expect(valid).toBeDefined();
-            expect(invalid).toBeDefined();
         });
     });
 
@@ -379,7 +349,6 @@ describe('Schema DSL', () => {
             // Type assertions - all regular fields are wrapped
             expectTypeOf<Todo>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: { value: string; version: number };
                 completed: { value: boolean; version: number };
                 priority: { value: number; version: number };
@@ -388,7 +357,6 @@ describe('Schema DSL', () => {
             // Runtime usage example
             const validItem: Todo = {
                 id: '123',
-                createdAt: Date.now(),
                 title: { value: 'Test', version: Date.now() },
                 completed: { value: false, version: Date.now() },
                 priority: { value: 1, version: Date.now() },
@@ -412,7 +380,6 @@ describe('Schema DSL', () => {
 
             expectTypeOf<User>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 name: { value: string; version: number };
             }>();
         });
@@ -437,7 +404,6 @@ describe('Schema DSL', () => {
             // Type assertions - all fields are plain values
             expectTypeOf<TodoState>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: string;
                 completed: boolean;
                 priority: number;
@@ -446,7 +412,6 @@ describe('Schema DSL', () => {
             // Runtime usage example
             const validItem: TodoState = {
                 id: '123',
-                createdAt: Date.now(),
                 title: 'Test',
                 completed: false,
                 priority: 1,
@@ -477,7 +442,6 @@ describe('Schema DSL', () => {
 
             expectTypeOf<TodoState>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: string;
                 assignedTo: string;
                 reviewer: string | null;
@@ -525,7 +489,6 @@ describe('Schema DSL', () => {
             // Type assertions - mutable fields become two properties
             expectTypeOf<TodoDenorm>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: string;
                 titleVersion: number;
                 completed: boolean;
@@ -537,7 +500,6 @@ describe('Schema DSL', () => {
             // Runtime usage example
             const validDenorm: TodoDenorm = {
                 id: '123',
-                createdAt: Date.now(),
                 title: 'Test',
                 titleVersion: Date.now(),
                 completed: false,
@@ -566,7 +528,6 @@ describe('Schema DSL', () => {
             // All regular fields should have version
             expectTypeOf<ItemDenorm>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 name: string;
                 nameVersion: number;
                 count: number;
@@ -575,7 +536,6 @@ describe('Schema DSL', () => {
 
             const valid: ItemDenorm = {
                 id: '1',
-                createdAt: 1,
                 name: 'Test',
                 nameVersion: 1,
                 count: 5,
@@ -753,7 +713,6 @@ describe('Schema DSL', () => {
 
             expectTypeOf<Todo>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: { value: string; version: number };
                 assignedTo: string;
                 reviewer: string | null;
@@ -761,7 +720,6 @@ describe('Schema DSL', () => {
 
             const validItem: Todo = {
                 id: '1',
-                createdAt: Date.now(),
                 title: { value: 'Task', version: Date.now() },
                 assignedTo: 'user-1',
                 reviewer: null,
@@ -792,7 +750,6 @@ describe('Schema DSL', () => {
 
             expectTypeOf<TodoDenorm>().toMatchTypeOf<{
                 id: string;
-                createdAt: number;
                 title: string;
                 titleVersion: number;
                 assignedTo: string;
@@ -801,7 +758,6 @@ describe('Schema DSL', () => {
 
             const validDenorm: TodoDenorm = {
                 id: '1',
-                createdAt: Date.now(),
                 title: 'Task',
                 titleVersion: Date.now(),
                 assignedTo: 'user-1',
