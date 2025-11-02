@@ -29,16 +29,13 @@ describe('Local Fields', () => {
 
         it('should define schema with local fields', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                            isSelected: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                        isSelected: localField(false),
+                    },
+                }),
             });
 
             const fields = schema.collection('todos');
@@ -50,16 +47,13 @@ describe('Local Fields', () => {
     describe('Type Inference - Create', () => {
         it('should NOT include local fields in Create type', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             type CreateTodo = InferCreate<typeof schema, 'todos'>;
@@ -77,15 +71,12 @@ describe('Local Fields', () => {
     describe('Type Inference - Update', () => {
         it('should include local fields in Update type', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
@@ -102,15 +93,12 @@ describe('Local Fields', () => {
     describe('Type Inference - Item', () => {
         it('should wrap local fields with value and version', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             type Todo = InferItem<typeof schema, 'todos'>;
@@ -127,15 +115,12 @@ describe('Local Fields', () => {
     describe('Type Inference - ItemState', () => {
         it('should represent local fields as plain values', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             type TodoState = InferItemState<typeof schema, 'todos'>;
@@ -151,16 +136,13 @@ describe('Local Fields', () => {
     describe('Sync Engine Behavior', () => {
         it('should initialize local fields with defaults when creating from server', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                            isSelected: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                        isSelected: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -182,27 +164,24 @@ describe('Local Fields', () => {
 
         it('should NOT update local fields from server when patching', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
+            }).withMutations({
+                toggleExpanded: mutation(
+                    z.object({
+                        id: z.string(),
+                        isExpanded: z.boolean(),
                     }),
-                },
-                mutations: {
-                    toggleExpanded: mutation(
-                        z.object({
-                            id: z.string(),
-                            isExpanded: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].isExpanded = input.isExpanded;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].isExpanded = input.isExpanded;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -238,28 +217,25 @@ describe('Local Fields', () => {
 
         it('should allow local mutations on local fields', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                            isSelected: localField(false),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                        isSelected: localField(false),
+                    },
+                }),
+            }).withMutations({
+                toggleSelection: mutation(
+                    z.object({
+                        id: z.string(),
+                        isSelected: z.boolean(),
                     }),
-                },
-                mutations: {
-                    toggleSelection: mutation(
-                        z.object({
-                            id: z.string(),
-                            isSelected: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].isSelected = input.isSelected;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].isSelected = input.isSelected;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -287,38 +263,35 @@ describe('Local Fields', () => {
 
         it('should preserve local fields through rebases', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            priority: field<number>(),
-                            isExpanded: localField(false),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        priority: field<number>(),
+                        isExpanded: localField(false),
+                    },
+                }),
+            }).withMutations({
+                expand: mutation(
+                    z.object({
+                        id: z.string(),
                     }),
-                },
-                mutations: {
-                    expand: mutation(
-                        z.object({
-                            id: z.string(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].isExpanded = true;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].isExpanded = true;
                         }
-                    ),
-                    updatePriority: mutation(
-                        z.object({
-                            id: z.string(),
-                            priority: z.number(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].priority = input.priority;
-                            }
+                    }
+                ),
+                updatePriority: mutation(
+                    z.object({
+                        id: z.string(),
+                        priority: z.number(),
+                    }),
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].priority = input.priority;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -354,18 +327,15 @@ describe('Local Fields', () => {
 
         it('should work with different default value types', () => {
             const schema = defineSchema({
-                types: {
-                    items: type({
-                        fields: {
-                            name: field<string>(),
-                            expanded: localField(false),
-                            selectedCount: localField(0),
-                            tags: localField<string[]>([]),
-                            metadata: localField<{ foo: string }>({ foo: 'bar' }),
-                        },
-                    }),
-                },
-                mutations: {},
+                items: type({
+                    fields: {
+                        name: field<string>(),
+                        expanded: localField(false),
+                        selectedCount: localField(0),
+                        tags: localField<string[]>([]),
+                        metadata: localField<{ foo: string }>({ foo: 'bar' }),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -388,15 +358,12 @@ describe('Local Fields', () => {
     describe('Rebase Options', () => {
         it('should update local fields when allowLocalFields is true', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -425,15 +392,12 @@ describe('Local Fields', () => {
 
         it('should ignore server fields when allowServerFields is false', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -462,15 +426,12 @@ describe('Local Fields', () => {
 
         it('should update only local fields when both options are set appropriately', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -498,15 +459,12 @@ describe('Local Fields', () => {
 
         it('should update both server and local fields when both are allowed', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -534,24 +492,21 @@ describe('Local Fields', () => {
 
         it('should patch both states directly when direct is true', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    toggleCompleted: mutation(
-                        z.object({ id: z.string() }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = !draft.todos[input.id].completed;
-                            }
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                toggleCompleted: mutation(
+                    z.object({ id: z.string() }),
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = !draft.todos[input.id].completed;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -588,15 +543,12 @@ describe('Local Fields', () => {
 
         it('should work with singleton objects and allowLocalFields', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -630,15 +582,12 @@ describe('Local Fields', () => {
 
         it('should preserve default behavior when no options provided', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });

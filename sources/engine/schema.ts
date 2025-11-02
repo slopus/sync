@@ -323,56 +323,74 @@ export type SchemaDefinition = {
  * - draft: Mutable draft of the current state (via Immer)
  * - input: The validated input data for this mutation
  *
- * Note: The draft parameter is typed as `any` to allow flexible usage.
- * Type safety is provided by the schema definition and TypeScript inference.
+ * @typeParam TState - The state type (inferred from schema when using defineTypes())
+ * @typeParam TInput - The input type (inferred from Zod schema)
  */
-export type MutationHandler<TInput> = (
-    draft: any,
+export type MutationHandler<TState, TInput> = (
+    draft: TState,
     input: TInput
 ) => void;
 
 /**
  * Single mutation descriptor containing both schema and handler
  */
-export interface MutationDescriptor<TInput> {
+export interface MutationDescriptor<TState, TInput> {
     /** Zod schema for validating mutation input */
     schema: z.ZodType<TInput>;
     /** Handler function that applies the mutation to state */
-    handler: MutationHandler<TInput>;
+    handler: MutationHandler<TState, TInput>;
 }
 
 /**
  * Mutation definition
  * Maps mutation names to their descriptors (schema + handler)
  */
-export type MutationDefinition = {
-    [mutationName: string]: MutationDescriptor<any>;
+export type MutationDefinition<TState = any> = {
+    [mutationName: string]: MutationDescriptor<TState, any>;
 };
 
 /**
  * Create a mutation descriptor with schema and handler
+ *
+ * For full type safety, use with `defineTypes().withMutations()` instead of `defineSchema()`.
  *
  * @param schema - Zod schema for validating mutation input
  * @param handler - Handler function that applies the mutation to state
  * @returns Mutation descriptor
  *
  * @example
+ * // With type safety (recommended):
+ * const types = defineTypes({
+ *   todos: type({ fields: { title: field<string>() } })
+ * });
+ *
+ * const schema = types.withMutations({
+ *   createTodo: mutation(
+ *     z.object({ id: z.string(), title: z.string() }),
+ *     (draft, input) => {
+ *       draft.todos[input.id] = { id: input.id, title: input.title }; // ✓ Fully typed!
+ *     }
+ *   )
+ * });
+ *
+ * @example
+ * // Without type safety (simple):
  * const schema = defineSchema({
  *   types: { todos: type({ fields: { title: field<string>() } }) },
  *   mutations: {
  *     createTodo: mutation(
  *       z.object({ id: z.string(), title: z.string() }),
  *       (draft, input) => {
- *         draft.todos[input.id] = { id: input.id, title: input.title };
+ *         draft.todos[input.id] = { id: input.id, title: input.title }; // draft: any
  *       }
  *     )
  *   }
  * });
  */
-export function mutation<TInput>(
+export function mutation<TState, TInput>(
     schema: z.ZodType<TInput>,
-    handler: MutationHandler<TInput>
-): MutationDescriptor<TInput> {
+    handler: MutationHandler<TState, TInput>
+): MutationDescriptor<TState, TInput> {
     return { schema, handler };
 }
 
@@ -449,6 +467,22 @@ export type Schema<T extends FullSchemaDefinition> = {
      * Get all mutation names
      */
     mutations(): T['mutations'] extends MutationDefinition ? (keyof T['mutations'])[] : never;
+
+    /**
+     * Add mutations with full type safety (chainable)
+     * The draft parameter in mutation handlers will be properly typed
+     * Can be called multiple times to progressively add mutations
+     * Throws error if mutation names already exist
+     *
+     * @param mutations - Mutation definitions with handlers
+     * @returns New schema with merged mutations (chainable)
+     */
+    withMutations<TNewMutations extends MutationDefinition<InferStateFromTypes<T['types']>>>(
+        mutations: TNewMutations
+    ): Schema<{
+        types: T['types'];
+        mutations: (T['mutations'] extends object ? T['mutations'] : {}) & TNewMutations;
+    }>;
 };
 
 // ============================================================================
@@ -852,7 +886,7 @@ type ExtractMutationDefinition<T> = T extends Schema<infer S>
  * // { title: string; completed: boolean }
  */
 export type InferMutationInput<TSchema, TMutation extends keyof NonNullable<ExtractMutationDefinition<TSchema>>> =
-    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends MutationDescriptor<infer TInput>
+    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends MutationDescriptor<any, infer TInput>
         ? TInput
         : never;
 
@@ -876,7 +910,7 @@ export type InferMutationInput<TSchema, TMutation extends keyof NonNullable<Extr
  * // { title: string; completed: boolean }
  */
 export type InferMutationOutput<TSchema, TMutation extends keyof NonNullable<ExtractMutationDefinition<TSchema>>> =
-    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends MutationDescriptor<infer TInput>
+    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends MutationDescriptor<any, infer TInput>
         ? TInput
         : never;
 
@@ -970,54 +1004,78 @@ export type InitialObjectValuesParam<T extends FullSchemaDefinition> =
         : Record<string, never>;
 
 // ============================================================================
-// Schema Definition Function
+// Schema Definition Functions
 // ============================================================================
 
 /**
- * Define a schema for collections and mutations
- * Validates that all references point to collections that exist in the schema
+ * Helper type to infer state structure from type definitions
+ * Used internally to provide type safety in mutation handlers
+ */
+type InferStateFromTypes<TTypes extends SchemaDefinition> = {
+    [K in keyof TTypes]: TTypes[K] extends CollectionType
+        ? Record<string, InferItemState<Schema<{ types: TTypes; mutations: {} }>, K>>
+        : TTypes[K] extends ObjectType
+            ? InferObjectState<Schema<{ types: TTypes; mutations: {} }>, K>
+            : never;
+};
+
+/**
+ * Define a schema with type definitions (collections and singleton objects)
+ * Returns a schema with full type safety for mutation handlers via .withMutations()
  *
- * @param schema - Schema definition with types and optional mutations
- * @returns Typed schema object with type inference utilities
+ * This approach gives you TypeScript autocomplete and type checking in mutation handlers.
+ * Chain .withMutations() calls to progressively add mutations.
+ *
+ * @param types - Type definitions (collections and singleton objects)
+ * @returns Schema with empty mutations and chainable .withMutations() method
  *
  * @example
  * const schema = defineSchema({
- *   types: {
- *     users: type({
- *       fields: {
- *         name: field<string>(),
+ *   todos: type({
+ *     fields: {
+ *       title: field<string>(),
+ *       completed: field<boolean>(),
+ *     },
+ *   }),
+ * }).withMutations({
+ *   createTodo: mutation(
+ *     z.object({ id: z.string(), title: z.string() }),
+ *     (draft, input) => {
+ *       // draft is fully typed! Autocomplete works here!
+ *       draft.todos[input.id] = {
+ *         id: input.id,
+ *         title: input.title,
+ *         completed: false,
+ *       };
+ *     }
+ *   ),
+ * }).withMutations({
+ *   updateTodo: mutation(
+ *     z.object({ id: z.string(), completed: z.boolean() }),
+ *     (draft, input) => {
+ *       if (draft.todos[input.id]) {
+ *         draft.todos[input.id].completed = input.completed;
  *       }
- *     }),
- *     todos: type({
- *       fields: {
- *         title: field<string>(),
- *         assignedTo: reference('users'), // Valid - 'users' exists
- *       }
- *     })
- *   },
- *   mutations: {
- *     createTodo: mutation(
- *       z.object({ id: z.string(), title: z.string() }),
- *       (draft, input) => {
- *         draft.todos[input.id] = { id: input.id, title: input.title };
- *       }
- *     ),
- *     updateTodo: mutation(
- *       z.object({ id: z.string(), title: z.string() }),
- *       (draft, input) => {
- *         draft.todos[input.id].title = input.title;
- *       }
- *     )
- *   }
+ *     }
+ *   ),
  * });
- *
- * // Use type inference
- * type CreateTodo = InferCreate<typeof schema, 'todos'>;
- * type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
- * type Todo = InferItem<typeof schema, 'todos'>;
- * type TodoDenorm = InferDenormalized<typeof schema, 'todos'>;
  */
-export function defineSchema<T extends FullSchemaDefinition>(
+export function defineSchema<TTypes extends SchemaDefinition>(
+    types: ValidateReferences<TTypes> extends TTypes ? TTypes : ValidateReferences<TTypes>
+): Schema<{ types: TTypes; mutations: {} }> {
+    const validatedTypes = types as TTypes;
+    const fullSchema = { types: validatedTypes, mutations: {} };
+    return createSchemaInternal(fullSchema as any) as Schema<{ types: TTypes; mutations: {} }>;
+}
+
+/**
+ * Internal helper to create a schema object from a full schema definition
+ * Used internally by defineSchema() and withMutations()
+ *
+ * @param schema - Full schema definition with types and mutations
+ * @returns Typed schema object with all methods
+ */
+function createSchemaInternal<T extends FullSchemaDefinition>(
     schema: ValidateFullSchema<T> extends T ? T : ValidateFullSchema<T>
 ): Schema<T> {
     const s = schema as T;
@@ -1037,6 +1095,29 @@ export function defineSchema<T extends FullSchemaDefinition>(
         },
         mutations() {
             return s.mutations ? Object.keys(s.mutations) as (keyof T['mutations'])[] : [] as never;
+        },
+        withMutations<TNewMutations extends MutationDefinition<InferStateFromTypes<T['types']>>>(
+            newMutations: TNewMutations
+        ): Schema<{
+            types: T['types'];
+            mutations: (T['mutations'] extends object ? T['mutations'] : {}) & TNewMutations;
+        }> {
+            // Check for duplicate mutation names
+            const existingMutations = s.mutations ?? {};
+            for (const mutationName in newMutations) {
+                if (mutationName in existingMutations) {
+                    throw new Error(
+                        `Mutation '${mutationName}' already exists. Cannot add duplicate mutation names. ` +
+                        `Use a different name or remove the existing mutation first.`
+                    );
+                }
+            }
+
+            // Merge mutations
+            const mergedMutations = { ...existingMutations, ...newMutations };
+            const mergedSchema = { types: s.types, mutations: mergedMutations };
+
+            return createSchemaInternal(mergedSchema as any);
         },
     } as Schema<T>;
 }

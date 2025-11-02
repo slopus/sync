@@ -24,54 +24,66 @@ Note: `zod` is a peer dependency used for mutation validation.
 
 ### 1. Define Your Schema
 
+Define your schema with full TypeScript autocomplete and type checking using the chainable `.withMutations()` API:
+
 ```typescript
-import { defineSchema, type, field, localField, reference, mutation } from '@slopus/sync';
+import { defineSchema, type, field, localField, reference, mutation, syncEngine } from '@slopus/sync';
 import { z } from 'zod';
 import { createId } from '@paralleldrive/cuid2';
 
+// Define schema with types, then chain mutations for full type safety
 const schema = defineSchema({
-    types: {
-        todos: type({
-            fields: {
-                title: field<string>(),
-                completed: field<boolean>(),
-                assignedTo: reference('users', true), // nullable reference
-                isExpanded: localField(false), // client-only UI state
-            },
+    todos: type({
+        fields: {
+            title: field<string>(),
+            completed: field<boolean>(),
+            assignedTo: reference('users', true), // nullable reference
+            isExpanded: localField(false), // client-only UI state
+        },
+    }),
+    users: type({
+        fields: {
+            name: field<string>(),
+            email: field<string>(),
+        },
+    }),
+}).withMutations({
+    createTodo: mutation(
+        z.object({
+            title: z.string(),
+            assignedTo: z.string().nullable(),
         }),
-        users: type({
-            fields: {
-                name: field<string>(),
-                email: field<string>(),
-            },
-        }),
-    },
-    mutations: {
-        createTodo: mutation(
-            z.object({
-                title: z.string(),
-                assignedTo: z.string().nullable(),
-            }),
-            (draft, input) => {
-                const id = createId();
-                draft.todos[id] = {
-                    id,
-                    title: input.title,
-                    completed: false,
-                    assignedTo: input.assignedTo,
-                    isExpanded: false, // local field gets default value
-                };
+        (draft, input) => {
+            // ✨ draft.todos has full autocomplete here!
+            const id = createId();
+            draft.todos[id] = {
+                id,
+                title: input.title,
+                completed: false,
+                assignedTo: input.assignedTo,
+                isExpanded: false,
+            };
+        }
+    ),
+    toggleTodo: mutation(
+        z.object({ id: z.string() }),
+        (draft, input) => {
+            // ✨ TypeScript will catch typos like draft.todoss[input.id]
+            if (draft.todos[input.id]) {
+                draft.todos[input.id].completed = !draft.todos[input.id].completed;
             }
-        ),
-        toggleTodo: mutation(
-            z.object({ id: z.string() }),
-            (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = !draft.todos[input.id].completed;
-                }
-            }
-        ),
-    },
+        }
+    ),
+});
+
+// You can also chain multiple .withMutations() calls:
+const extendedSchema = schema.withMutations({
+    deleteTodo: mutation(
+        z.object({ id: z.string() }),
+        (draft, input) => {
+            delete draft.todos[input.id];
+        }
+    ),
 });
 ```
 
@@ -144,16 +156,7 @@ const schema = defineSchema({
                 notifications: field<boolean>(),
             },
         }),
-    },
-    mutations: {
-        // Define mutations with schema and handler
-        updateTheme: mutation(
-            z.object({ theme: z.enum(['light', 'dark']) }),
-            (draft, input) => {
-                draft.settings.theme = input.theme;
-            }
-        ),
-    },
+    }
 });
 
 // Singleton objects require initial values
@@ -302,13 +305,18 @@ type ToggleTodoInput = InferMutationInput<typeof schema, 'toggleTodo'>;
 
 ### Schema DSL
 
-- `defineSchema(definition)` - Define your data schema
+- `defineSchema(types)` - Define schema with type definitions (collections and singleton objects)
+  - Returns a schema with empty mutations and chainable `.withMutations()` method
+  - Provides full TypeScript autocomplete in mutation handlers
+  - Chain `.withMutations()` to add fully-typed mutations
+  - Can chain multiple `.withMutations()` calls to progressively add mutations
 - `type(options)` - Define a collection type
 - `object(options)` - Define a singleton object type
 - `field<T>()` - Define a synced field
 - `localField<T>(defaultValue)` - Define a local-only field
 - `reference(collection, nullable)` - Define a reference field
 - `mutation(schema, handler)` - Define a mutation with Zod schema and handler function
+- `.withMutations(mutations)` - Add mutations to a schema (chainable, throws error on duplicate names)
 
 ### Sync Engine
 

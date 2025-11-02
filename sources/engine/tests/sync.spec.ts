@@ -17,24 +17,21 @@ describe('Sync Engine', () => {
     describe('Initialization', () => {
         it('should create a sync engine with empty state', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {}
-                    ),
-                },
+                    (draft, input) => {}
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -47,19 +44,16 @@ describe('Sync Engine', () => {
 
         it('should have correct type for state', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({ id: z.string(), title: z.string() }),
-                        (draft, input) => {}
-                    ),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({ id: z.string(), title: z.string() }),
+                    (draft, input) => {}
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -78,27 +72,24 @@ describe('Sync Engine', () => {
     describe('Pending Mutations', () => {
         it('should expose pending mutations through getter', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -124,27 +115,24 @@ describe('Sync Engine', () => {
 
         it('should reduce pending mutations after commit', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -170,27 +158,24 @@ describe('Sync Engine', () => {
 
         it('should return readonly array to prevent external modification', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -208,48 +193,45 @@ describe('Sync Engine', () => {
 
         it('should have strictly typed input based on mutation name', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: false,
-                            };
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: false,
+                        };
+                    }
+                ),
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        completed: z.boolean(),
+                    }),
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = input.completed;
                         }
-                    ),
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = input.completed;
-                            }
-                        }
-                    ),
-                    deleteTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                        }),
-                        (draft, input) => {
-                            delete draft.todos[input.id];
-                        }
-                    ),
-                },
+                    }
+                ),
+                deleteTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                    }),
+                    (draft, input) => {
+                        delete draft.todos[input.id];
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -282,30 +264,27 @@ describe('Sync Engine', () => {
 
         it('should provide type-safe access to mutation input', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            priority: field<number>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        priority: field<number>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        priority: z.number(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            priority: z.number(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                priority: input.priority,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            priority: input.priority,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -327,31 +306,28 @@ describe('Sync Engine', () => {
     describe('Mutators', () => {
         it('should register a mutator', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            const data = input as { id: string; title: string; completed: boolean };
-                            draft.todos[data.id] = {
-                                id: data.id,
-                                title: data.title,
-                                completed: data.completed,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        const data = input as { id: string; title: string; completed: boolean };
+                        draft.todos[data.id] = {
+                            id: data.id,
+                            title: data.title,
+                            completed: data.completed,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -362,31 +338,28 @@ describe('Sync Engine', () => {
 
         it('should apply mutation to state', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            const data = input as { id: string; title: string; completed: boolean };
-                            draft.todos[data.id] = {
-                                id: data.id,
-                                title: data.title,
-                                completed: data.completed,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        const data = input as { id: string; title: string; completed: boolean };
+                        draft.todos[data.id] = {
+                            id: data.id,
+                            title: data.title,
+                            completed: data.completed,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -404,41 +377,38 @@ describe('Sync Engine', () => {
 
         it('should apply multiple mutations in order', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: input.completed,
-                            };
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: input.completed,
+                        };
+                    }
+                ),
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        completed: z.boolean(),
+                    }),
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = input.completed;
                         }
-                    ),
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = input.completed;
-                            }
-                        }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -461,16 +431,13 @@ describe('Sync Engine', () => {
     describe('Rebase', () => {
         it('should patch existing items with partial data', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -502,15 +469,12 @@ describe('Sync Engine', () => {
 
         it('should ignore partial items without all required fields when creating new items', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -530,15 +494,12 @@ describe('Sync Engine', () => {
 
         it('should create new items when all required fields are present', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -559,15 +520,12 @@ describe('Sync Engine', () => {
 
         it('should handle null values in partial updates', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            description: field<string | null>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        description: field<string | null>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -596,27 +554,24 @@ describe('Sync Engine', () => {
 
         it('should update server state and rebase pending mutations', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = input.completed;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = input.completed;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -647,27 +602,24 @@ describe('Sync Engine', () => {
 
         it('should reapply pending mutations when server state updates', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = input.completed;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = input.completed;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -705,41 +657,38 @@ describe('Sync Engine', () => {
     describe('Commit', () => {
         it('should commit multiple mutations at once', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: input.completed,
-                            };
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: input.completed,
+                        };
+                    }
+                ),
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        completed: z.boolean(),
+                    }),
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = input.completed;
                         }
-                    ),
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = input.completed;
-                            }
-                        }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -786,27 +735,24 @@ describe('Sync Engine', () => {
 
         it('should commit single mutation with string ID', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -823,26 +769,23 @@ describe('Sync Engine', () => {
 
         it('should commit array of mutation IDs', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].title = input.title;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].title = input.title;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -875,30 +818,27 @@ describe('Sync Engine', () => {
 
         it('should remove pending mutation when committed', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: input.completed,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: input.completed,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -932,27 +872,24 @@ describe('Sync Engine', () => {
     describe('Type Safety', () => {
         it('should enforce correct mutation input types', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -974,35 +911,32 @@ describe('Sync Engine', () => {
 
         it('should work with references', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        assignedTo: z.string(),
                     }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                        },
-                    }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            assignedTo: z.string(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                assignedTo: input.assignedTo,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            assignedTo: input.assignedTo,
+                        };
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });

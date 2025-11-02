@@ -8,14 +8,12 @@ import { defineSchema, type, field, type PartialServerUpdate } from '../index';
 describe('Type Enforcement', () => {
     it('should require version field when versioned=true', () => {
         const schema = defineSchema({
-            types: {
-                todos: type({
-                    fields: {
-                        title: field<string>(),
-                    },
-                    versioned: true,
-                }),
-            }
+            todos: type({
+                fields: {
+                    title: field<string>(),
+                },
+                versioned: true,
+            }),
         });
 
         type SchemaType = typeof schema._schema;
@@ -37,13 +35,11 @@ describe('Type Enforcement', () => {
 
     it('should prohibit version field when versioned is omitted', () => {
         const schema = defineSchema({
-            types: {
-                settings: type({
-                    fields: {
-                        theme: field<string>(),
-                    },
-                }),
-            }
+            settings: type({
+                fields: {
+                    theme: field<string>(),
+                },
+            }),
         });
 
         type SchemaType = typeof schema._schema;

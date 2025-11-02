@@ -17,15 +17,12 @@ describe('Singleton Objects', () => {
     describe('Basic singleton functionality', () => {
         it('should create a singleton object with direct access', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            fontSize: field<number>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        fontSize: field<number>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -53,15 +50,12 @@ describe('Singleton Objects', () => {
 
         it('should update singleton fields with partial updates', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            fontSize: field<number>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        fontSize: field<number>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -96,19 +90,16 @@ describe('Singleton Objects', () => {
 
         it('should work with mixed schema (collections + singletons)', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -149,16 +140,13 @@ describe('Singleton Objects', () => {
 
         it('should use LWW resolution for versioned singleton', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            fontSize: field<number>(),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        fontSize: field<number>(),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -200,15 +188,12 @@ describe('Singleton Objects', () => {
 
         it('should reject older versions with LWW', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -248,15 +233,12 @@ describe('Singleton Objects', () => {
     describe('Local fields with singletons', () => {
         it('should initialize local fields with defaults in singleton', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -283,15 +265,12 @@ describe('Singleton Objects', () => {
             vi.useFakeTimers();
 
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {
@@ -335,15 +314,12 @@ describe('Singleton Objects', () => {
     describe('Type safety', () => {
         it('should enforce correct types for singleton access', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<'light' | 'dark'>(),
-                            fontSize: field<number>(),
-                        },
-                    }),
-                },
-                mutations: {},
+                settings: object({
+                    fields: {
+                        theme: field<'light' | 'dark'>(),
+                        fontSize: field<number>(),
+                    },
+                }),
             });
 
             const engine = syncEngine(schema, {

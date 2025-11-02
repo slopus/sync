@@ -31,28 +31,24 @@ describe('Schema DSL', () => {
         it('should only accept valid field descriptors', () => {
             // Valid descriptors work fine
             const validSchema = defineSchema({
-                types: {
-                    valid: type({
-                        fields: {
-                            field1: field<string>(),
-                            field2: field<number>(),
-                        },
-                    }),
-                },
+                valid: type({
+                    fields: {
+                        field1: field<string>(),
+                        field2: field<number>(),
+                    },
+                }),
             });
 
             expect(validSchema).toBeDefined();
 
             // Invalid descriptor object should not be assignable
             const invalidSchema = defineSchema({
-                types: {
-                    invalid: type({
-                        fields: {
-                            // @ts-expect-error - fieldType must be 'mutable' or 'immutable'
-                            badField: { fieldType: 'other' },
-                        },
-                    }),
-                },
+                invalid: type({
+                    fields: {
+                        // @ts-expect-error - fieldType must be 'mutable' or 'immutable'
+                        badField: { fieldType: 'other' },
+                    },
+                }),
             });
 
             expect(invalidSchema).toBeDefined();
@@ -78,21 +74,19 @@ describe('Schema DSL', () => {
     describe('Schema Definition', () => {
         it('should define a schema with multiple collections', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                            email: field<string>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                        email: field<string>(),
+                    },
+                }),
             });
 
             expect(schema._schema).toBeDefined();
@@ -102,13 +96,11 @@ describe('Schema DSL', () => {
 
         it('should access collection schema', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
             });
 
             const todoSchema = schema.collection('todos');
@@ -119,15 +111,13 @@ describe('Schema DSL', () => {
 
         it('should prohibit reserved field names', () => {
             const schema1 = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            // @ts-expect-error - id is a reserved field name
-                            id: field<string>(),
-                            title: field<string>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        // @ts-expect-error - id is a reserved field name
+                        id: field<string>(),
+                        title: field<string>(),
+                    },
+                }),
             });
 
             expect(schema1).toBeDefined();
@@ -137,15 +127,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - Create', () => {
         it('should infer create type with id and all fields as plain values', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type CreateTodo = InferCreate<typeof schema, 'todos'>;
@@ -171,13 +159,11 @@ describe('Schema DSL', () => {
 
         it('should require id in create type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
             });
 
             type CreateUser = InferCreate<typeof schema, 'users'>;
@@ -192,15 +178,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - Update', () => {
         it('should infer update type with id and all regular fields as optional', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
@@ -227,14 +211,12 @@ describe('Schema DSL', () => {
 
         it('should include all regular fields in update type', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
@@ -249,15 +231,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - UpdateFull', () => {
         it('should require all fields in UpdateFull type', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type UpdateFullTodo = InferUpdateFull<typeof schema, 'todos'>;
@@ -283,19 +263,17 @@ describe('Schema DSL', () => {
 
         it('should exclude references from UpdateFull type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                    },
+                }),
             });
 
             type UpdateFullTodo = InferUpdateFull<typeof schema, 'todos'>;
@@ -309,14 +287,12 @@ describe('Schema DSL', () => {
 
         it('should include local fields in UpdateFull type', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                }),
             });
 
             type UpdateFullTodo = InferUpdateFull<typeof schema, 'todos'>;
@@ -333,15 +309,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - Item', () => {
         it('should infer item type with wrapped regular fields', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type Todo = InferItem<typeof schema, 'todos'>;
@@ -367,13 +341,11 @@ describe('Schema DSL', () => {
 
         it('should automatically include id and createdAt', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
             });
 
             type User = InferItem<typeof schema, 'users'>;
@@ -388,15 +360,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - ItemState', () => {
         it('should infer item state type with plain values', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type TodoState = InferItemState<typeof schema, 'todos'>;
@@ -422,20 +392,18 @@ describe('Schema DSL', () => {
 
         it('should handle references in item state', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                            reviewer: reference('users', { nullable: true }),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                        reviewer: reference('users', { nullable: true }),
+                    },
+                }),
             });
 
             type TodoState = InferItemState<typeof schema, 'todos'>;
@@ -450,13 +418,11 @@ describe('Schema DSL', () => {
 
         it('should differ from InferItem by having plain values', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
             });
 
             type TodoItem = InferItem<typeof schema, 'todos'>;
@@ -473,15 +439,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - Denormalized', () => {
         it('should infer denormalized type with flat mutable fields', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            priority: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        priority: field<number>(),
+                    },
+                }),
             });
 
             type TodoDenorm = InferDenormalized<typeof schema, 'todos'>;
@@ -513,14 +477,12 @@ describe('Schema DSL', () => {
 
         it('should add version for all regular fields', () => {
             const schema = defineSchema({
-                types: {
-                    items: type({
-                        fields: {
-                            name: field<string>(),
-                            count: field<number>(),
-                        },
-                    }),
-                },
+                items: type({
+                    fields: {
+                        name: field<string>(),
+                        count: field<number>(),
+                    },
+                }),
             });
 
             type ItemDenorm = InferDenormalized<typeof schema, 'items'>;
@@ -549,15 +511,13 @@ describe('Schema DSL', () => {
     describe('Type Inference - References', () => {
         it('should reject references to non-existent collections', () => {
             const badSchema = defineSchema({
-                types: {
-                    // @ts-expect-error - references 'users' which doesn't exist
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                        },
-                    }),
-                },
+                // @ts-expect-error - references 'users' which doesn't exist
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                    },
+                }),
             });
 
             expect(badSchema).toBeDefined();
@@ -565,19 +525,17 @@ describe('Schema DSL', () => {
 
         it('should accept valid references', () => {
             const goodSchema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'), // Valid - 'users' exists
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'), // Valid - 'users' exists
+                    },
+                }),
             });
 
             expect(goodSchema).toBeDefined();
@@ -585,19 +543,17 @@ describe('Schema DSL', () => {
 
         it('should infer non-nullable reference in create type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                    },
+                }),
             });
 
             type CreateTodo = InferCreate<typeof schema, 'todos'>;
@@ -619,19 +575,17 @@ describe('Schema DSL', () => {
 
         it('should infer nullable reference in create type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            reviewer: reference('users', { nullable: true }),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        reviewer: reference('users', { nullable: true }),
+                    },
+                }),
             });
 
             type CreateTodo = InferCreate<typeof schema, 'todos'>;
@@ -660,19 +614,17 @@ describe('Schema DSL', () => {
 
         it('should not include references in update type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                    },
+                }),
             });
 
             type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
@@ -693,20 +645,18 @@ describe('Schema DSL', () => {
 
         it('should infer references in item type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                            reviewer: reference('users', { nullable: true }),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                        reviewer: reference('users', { nullable: true }),
+                    },
+                }),
             });
 
             type Todo = InferItem<typeof schema, 'todos'>;
@@ -730,20 +680,18 @@ describe('Schema DSL', () => {
 
         it('should infer references in denormalized type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                            reviewer: reference('users', { nullable: true }),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                        reviewer: reference('users', { nullable: true }),
+                    },
+                }),
             });
 
             type TodoDenorm = InferDenormalized<typeof schema, 'todos'>;
@@ -771,15 +719,13 @@ describe('Schema DSL', () => {
     describe('Complex Schemas', () => {
         it('should handle all-mutable collection', () => {
             const schema = defineSchema({
-                types: {
-                    settings: type({
-                        fields: {
-                            theme: field<string>(),
-                            fontSize: field<number>(),
-                            darkMode: field<boolean>(),
-                        },
-                    }),
-                },
+                settings: type({
+                    fields: {
+                        theme: field<string>(),
+                        fontSize: field<number>(),
+                        darkMode: field<boolean>(),
+                    },
+                }),
             });
 
             type UpdateSettings = InferUpdate<typeof schema, 'settings'>;
@@ -794,14 +740,12 @@ describe('Schema DSL', () => {
 
         it('should handle all regular fields in update type', () => {
             const schema = defineSchema({
-                types: {
-                    metadata: type({
-                        fields: {
-                            createdBy: field<string>(),
-                            version: field<number>(),
-                        },
-                    }),
-                },
+                metadata: type({
+                    fields: {
+                        createdBy: field<string>(),
+                        version: field<number>(),
+                    },
+                }),
             });
 
             type UpdateMetadata = InferUpdate<typeof schema, 'metadata'>;
@@ -816,26 +760,24 @@ describe('Schema DSL', () => {
 
         it('should work with multiple collection types', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            done: field<boolean>(),
-                        },
-                    }),
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                            role: field<string>(),
-                        },
-                    }),
-                    logs: type({
-                        fields: {
-                            message: field<string>(),
-                            timestamp: field<number>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        done: field<boolean>(),
+                    },
+                }),
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                        role: field<string>(),
+                    },
+                }),
+                logs: type({
+                    fields: {
+                        message: field<string>(),
+                        timestamp: field<number>(),
+                    },
+                }),
             });
 
             type CreateTodo = InferCreate<typeof schema, 'todos'>;
@@ -865,23 +807,21 @@ describe('Schema DSL', () => {
     describe('Type Inference - InferCollections', () => {
         it('should infer collection names as union type', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                    settings: type({
-                        fields: {
-                            theme: field<string>(),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+                settings: type({
+                    fields: {
+                        theme: field<string>(),
+                    },
+                }),
             });
 
             type Collections = InferCollections<typeof schema>;
@@ -905,13 +845,11 @@ describe('Schema DSL', () => {
 
         it('should work with single collection schema', () => {
             const schema = defineSchema({
-                types: {
-                    items: type({
-                        fields: {
-                            value: field<number>(),
-                        },
-                    }),
-                },
+                items: type({
+                    fields: {
+                        value: field<number>(),
+                    },
+                }),
             });
 
             type Collections = InferCollections<typeof schema>;
@@ -924,26 +862,24 @@ describe('Schema DSL', () => {
 
         it('should work with complex multi-collection schemas', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                    posts: type({
-                        fields: {
-                            title: field<string>(),
-                            authorId: reference('users'),
-                        },
-                    }),
-                    comments: type({
-                        fields: {
-                            text: field<string>(),
-                            postId: reference('posts'),
-                            authorId: reference('users'),
-                        },
-                    }),
-                },
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
+                posts: type({
+                    fields: {
+                        title: field<string>(),
+                        authorId: reference('users'),
+                    },
+                }),
+                comments: type({
+                    fields: {
+                        text: field<string>(),
+                        postId: reference('posts'),
+                        authorId: reference('users'),
+                    },
+                }),
             });
 
             type Collections = InferCollections<typeof schema>;
@@ -953,18 +889,16 @@ describe('Schema DSL', () => {
 
         it('should be useful for generic collection operations', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                    }),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                }),
             });
 
             type Collections = InferCollections<typeof schema>;

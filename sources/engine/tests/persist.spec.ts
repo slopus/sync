@@ -18,30 +18,27 @@ describe('Persistence', () => {
     describe('persist() and restore', () => {
         it('should persist and restore empty state', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: input.completed,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: input.completed,
+                        };
+                    }
+                ),
             });
 
             // Create engine with empty state
@@ -61,30 +58,27 @@ describe('Persistence', () => {
 
         it('should persist and restore state with collections', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: input.completed,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: input.completed,
+                        };
+                    }
+                ),
             });
 
             // Create engine
@@ -128,30 +122,27 @@ describe('Persistence', () => {
 
         it('should persist and restore pending mutations', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        title: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            title: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: input.completed,
-                            };
-                        }
-                    ),
-                },
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: input.completed,
+                        };
+                    }
+                ),
             });
 
             // Create engine
@@ -208,22 +199,19 @@ describe('Persistence', () => {
 
         it('should persist and restore singleton objects', () => {
             const schema = defineSchema({
-                types: {
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                            notifications: field<boolean>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    updateTheme: mutation(
-                        z.object({ theme: z.string() }),
-                        (draft, input) => {
-                            draft.settings.theme = input.theme;
-                        }
-                    ),
-                },
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                        notifications: field<boolean>(),
+                    },
+                }),
+            }).withMutations({
+                updateTheme: mutation(
+                    z.object({ theme: z.string() }),
+                    (draft, input) => {
+                        draft.settings.theme = input.theme;
+                    }
+                ),
             });
 
             // Create engine with initial object values
@@ -256,25 +244,22 @@ describe('Persistence', () => {
 
         it('should persist and restore versioned collections', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        versioned: true,
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({ id: z.string(), title: z.string() }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                todos: type({
+                    versioned: true,
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({ id: z.string(), title: z.string() }),
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             // Create engine and add data with version from server
@@ -297,22 +282,19 @@ describe('Persistence', () => {
 
         it('should persist and restore local fields', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            localNote: localField<string>(''),
-                        },
-                    }),
-                },
-                mutations: {
-                    setLocalNote: mutation(
-                        z.object({ id: z.string(), note: z.string() }),
-                        (draft, input) => {
-                            draft.todos[input.id].localNote = input.note;
-                        }
-                    ),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        localNote: localField<string>(''),
+                    },
+                }),
+            }).withMutations({
+                setLocalNote: mutation(
+                    z.object({ id: z.string(), note: z.string() }),
+                    (draft, input) => {
+                        draft.todos[input.id].localNote = input.note;
+                    }
+                ),
             });
 
             // Create engine with server data
@@ -336,24 +318,21 @@ describe('Persistence', () => {
 
         it('should work with legacy initialization signature', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    createTodo: mutation(
-                        z.object({ id: z.string(), title: z.string() }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                            };
-                        }
-                    ),
-                },
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createTodo: mutation(
+                    z.object({ id: z.string(), title: z.string() }),
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                        };
+                    }
+                ),
             });
 
             // Create engine using legacy signature (backward compatibility)
@@ -365,50 +344,47 @@ describe('Persistence', () => {
 
         it('should handle complex state with multiple collections and objects', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        versioned: true,
-                        fields: {
-                            name: field<string>(),
-                            email: field<string>(),
-                        },
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                            userId: field<string>(),
-                        },
-                    }),
-                    settings: object({
-                        fields: {
-                            theme: field<string>(),
-                        },
-                    }),
-                },
-                mutations: {
-                    createUser: mutation(
-                        z.object({ id: z.string(), name: z.string(), email: z.string() }),
-                        (draft, input) => {
-                            draft.users[input.id] = {
-                                id: input.id,
-                                name: input.name,
-                                email: input.email,
-                            };
-                        }
-                    ),
-                    createTodo: mutation(
-                        z.object({ id: z.string(), title: z.string(), userId: z.string() }),
-                        (draft, input) => {
-                            draft.todos[input.id] = {
-                                id: input.id,
-                                title: input.title,
-                                completed: false,
-                                userId: input.userId,
-                            };
-                        }
-                    ),
-                },
+                users: type({
+                    versioned: true,
+                    fields: {
+                        name: field<string>(),
+                        email: field<string>(),
+                    },
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                        userId: field<string>(),
+                    },
+                }),
+                settings: object({
+                    fields: {
+                        theme: field<string>(),
+                    },
+                }),
+            }).withMutations({
+                createUser: mutation(
+                    z.object({ id: z.string(), name: z.string(), email: z.string() }),
+                    (draft, input) => {
+                        draft.users[input.id] = {
+                            id: input.id,
+                            name: input.name,
+                            email: input.email,
+                        };
+                    }
+                ),
+                createTodo: mutation(
+                    z.object({ id: z.string(), title: z.string(), userId: z.string() }),
+                    (draft, input) => {
+                        draft.todos[input.id] = {
+                            id: input.id,
+                            title: input.title,
+                            completed: false,
+                            userId: input.userId,
+                        };
+                    }
+                ),
             });
 
             // Create engine with complex state

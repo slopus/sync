@@ -19,16 +19,13 @@ describe('Dual-Representation Architecture', () => {
     describe('versioned = false (Simple Overwrite)', () => {
         it('should overwrite fields on every rebase when tracking is disabled', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                        // versioned omitted - disabled
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                    // versioned omitted - disabled
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -60,15 +57,12 @@ describe('Dual-Representation Architecture', () => {
 
         it('should set all version values to 0 when tracking is disabled', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                        },
-                        // versioned omitted - disabled
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                    // versioned omitted - disabled
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -98,16 +92,13 @@ describe('Dual-Representation Architecture', () => {
 
         it('should use LWW resolution when field timestamps differ', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                        versioned: true, // Enabled
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                    versioned: true, // Enabled
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -143,16 +134,13 @@ describe('Dual-Representation Architecture', () => {
 
         it('should handle out-of-order updates correctly with LWW', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -189,16 +177,13 @@ describe('Dual-Representation Architecture', () => {
 
         it('should handle field-level LWW (different fields at different times)', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -257,22 +242,19 @@ describe('Dual-Representation Architecture', () => {
 
         it('should work correctly with references', () => {
             const schema = defineSchema({
-                types: {
-                    users: type({
-                        fields: {
-                            name: field<string>(),
-                        },
-                        versioned: true,
-                    }),
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            assignedTo: reference('users'),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                users: type({
+                    fields: {
+                        name: field<string>(),
+                    },
+                    versioned: true,
+                }),
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        assignedTo: reference('users'),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -318,16 +300,13 @@ describe('Dual-Representation Architecture', () => {
     describe('Client State Projection', () => {
         it('should expose plain values in client state regardless of internal representation', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -350,28 +329,25 @@ describe('Dual-Representation Architecture', () => {
 
         it('should apply mutations on top of unwrapped server state', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            completed: field<boolean>(),
-                        },
-                        versioned: true,
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        completed: field<boolean>(),
+                    },
+                    versioned: true,
+                }),
+            }).withMutations({
+                updateTodo: mutation(
+                    z.object({
+                        id: z.string(),
+                        completed: z.boolean(),
                     }),
-                },
-                mutations: {
-                    updateTodo: mutation(
-                        z.object({
-                            id: z.string(),
-                            completed: z.boolean(),
-                        }),
-                        (draft, input) => {
-                            if (draft.todos[input.id]) {
-                                draft.todos[input.id].completed = input.completed;
-                            }
+                    (draft, input) => {
+                        if (draft.todos[input.id]) {
+                            draft.todos[input.id].completed = input.completed;
                         }
-                    ),
-                },
+                    }
+                ),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -404,16 +380,13 @@ describe('Dual-Representation Architecture', () => {
     describe('Local Fields with Dual Representation', () => {
         it('should initialize local fields with defaults in server snapshot', () => {
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -435,16 +408,13 @@ describe('Dual-Representation Architecture', () => {
             vi.useFakeTimers();
 
             const schema = defineSchema({
-                types: {
-                    todos: type({
-                        fields: {
-                            title: field<string>(),
-                            isExpanded: localField(false),
-                        },
-                        versioned: true,
-                    }),
-                },
-                mutations: {},
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                        isExpanded: localField(false),
+                    },
+                    versioned: true,
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
