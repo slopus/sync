@@ -6,8 +6,10 @@ import { describe, it, expect, expectTypeOf } from 'vitest';
 import {
     defineSchema,
     type,
+    object,
     field,
     mutation,
+    syncEngine,
     type InferMutationInput,
     type InferMutationOutput,
     type InferMutations,
@@ -138,7 +140,7 @@ describe('Schema Mutations', () => {
 
         expectTypeOf<CreateOutput>().toEqualTypeOf<{
             title: string;
-            completed: boolean;
+            completed?: boolean;
         }>();
     });
 
@@ -249,5 +251,163 @@ describe('Schema Mutations', () => {
                 createTodo: mutation((draft, input: { title: string }) => {}),
             });
         }).toThrow("Mutation 'createTodo' already exists");
+    });
+
+    it('should support direct mutations that apply without queueing', () => {
+        const schema = defineSchema({
+            todos: type({
+                fields: {
+                    title: field<string>(),
+                    completed: field<boolean>(),
+                },
+            }),
+        }).withMutations({
+            createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {
+                draft.todos[input.id] = {
+                    id: input.id,
+                    title: input.title,
+                    completed: input.completed,
+                };
+            }),
+            updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                if (draft.todos[input.id]) {
+                    draft.todos[input.id].completed = input.completed;
+                }
+            }),
+        });
+
+        const engine = syncEngine(schema, { from: 'new' });
+
+        // Normal mutation - should add to pending queue
+        engine.mutate('createTodo', { id: '1', title: 'Test Todo', completed: false });
+        expect(engine.pendingMutations).toHaveLength(1);
+        expect(engine.state.todos['1']).toEqual({
+            id: '1',
+            title: 'Test Todo',
+            completed: false,
+        });
+
+        // Direct mutation - should NOT add to pending queue
+        engine.mutate('updateTodo', { id: '1', completed: true }, { direct: true });
+        expect(engine.pendingMutations).toHaveLength(1); // Still only the createTodo mutation
+        expect(engine.state.todos['1'].completed).toBe(true);
+
+        // Verify the mutation was applied directly
+        expect(engine.state.todos['1']).toEqual({
+            id: '1',
+            title: 'Test Todo',
+            completed: true,
+        });
+    });
+
+    it('should handle direct mutations with collections', () => {
+        const schema = defineSchema({
+            todos: type({
+                fields: {
+                    title: field<string>(),
+                },
+            }),
+        }).withMutations({
+            createTodo: mutation((draft, input: { id: string; title: string }) => {
+                draft.todos[input.id] = {
+                    id: input.id,
+                    title: input.title,
+                };
+            }),
+            deleteTodo: mutation((draft, input: { id: string }) => {
+                delete draft.todos[input.id];
+            }),
+        });
+
+        const engine = syncEngine(schema, { from: 'new' });
+
+        // Create a todo normally
+        engine.mutate('createTodo', { id: '1', title: 'Test' });
+        expect(engine.pendingMutations).toHaveLength(1);
+
+        // Delete using direct mutation
+        engine.mutate('deleteTodo', { id: '1' }, { direct: true });
+        expect(engine.pendingMutations).toHaveLength(1); // Still only the createTodo mutation
+        expect(engine.state.todos['1']).toBeUndefined();
+    });
+
+    it('should handle direct mutations with singleton objects', () => {
+        const schema = defineSchema({
+            settings: object({
+                fields: {
+                    theme: field<string>(),
+                    fontSize: field<number>(),
+                },
+            }),
+        }).withMutations({
+            updateTheme: mutation((draft, input: { theme: string }) => {
+                draft.settings.theme = input.theme;
+            }),
+            updateFontSize: mutation((draft, input: { fontSize: number }) => {
+                draft.settings.fontSize = input.fontSize;
+            }),
+        });
+
+        const engine = syncEngine(schema, {
+            from: 'new',
+            objects: {
+                settings: { theme: 'light', fontSize: 14 },
+            },
+        });
+
+        // Normal mutation
+        engine.mutate('updateTheme', { theme: 'dark' });
+        expect(engine.pendingMutations).toHaveLength(1);
+        expect(engine.state.settings.theme).toBe('dark');
+
+        // Direct mutation
+        engine.mutate('updateFontSize', { fontSize: 16 }, { direct: true });
+        expect(engine.pendingMutations).toHaveLength(1); // Still only the updateTheme mutation
+        expect(engine.state.settings.fontSize).toBe(16);
+    });
+
+    it('should not affect server state with direct mutations', () => {
+        const schema = defineSchema({
+            todos: type({
+                fields: {
+                    completed: field<boolean>(),
+                },
+            }),
+        }).withMutations({
+            createTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                draft.todos[input.id] = { id: input.id, completed: input.completed };
+            }),
+            toggleTodo: mutation((draft, input: { id: string }) => {
+                if (draft.todos[input.id]) {
+                    draft.todos[input.id].completed = !draft.todos[input.id].completed;
+                }
+            }),
+        });
+
+        const engine = syncEngine(schema, { from: 'new' });
+
+        // Create a todo normally
+        engine.mutate('createTodo', { id: '1', completed: false });
+
+        // Simulate server confirming the mutation
+        engine.rebase({
+            todos: [{ id: '1', completed: false }],
+        });
+
+        // Commit the mutation
+        const mutationId = engine.pendingMutations[0].id;
+        engine.commit(mutationId);
+
+        // Verify server state
+        expect(engine.serverState.todos['1'].completed).toBe(false);
+
+        // Toggle using direct mutation
+        engine.mutate('toggleTodo', { id: '1' }, { direct: true });
+
+        // Client state should be updated
+        expect(engine.state.todos['1'].completed).toBe(true);
+
+        // Server state should remain unchanged
+        expect(engine.serverState.todos['1'].completed).toBe(false);
     });
 });

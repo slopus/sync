@@ -70,5 +70,6 @@ export type {
     FullLocalUpdate,
     PendingMutation,
     RebaseOptions,
+    MutateOptions,
     InitParam
 } from './engine';

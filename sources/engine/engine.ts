@@ -269,6 +269,19 @@ export interface RebaseOptions {
 }
 
 /**
+ * Options for mutate method to control how mutations are applied
+ */
+export interface MutateOptions {
+    /**
+     * Apply mutation directly to client state without queueing
+     * When true, the mutation is applied immediately to state but NOT added to pending queue
+     * This is useful for local-only state changes that don't need server confirmation
+     * @default false
+     */
+    direct?: boolean;
+}
+
+/**
  * Sync engine instance returned by sync()
  */
 export interface SyncEngine<T extends FullSchemaDefinition> {
@@ -292,10 +305,16 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
      *
      * The mutation handler must be defined in the schema.
      * If no handler is found, an error will be thrown.
+     *
+     * @param name - Name of the mutation to apply
+     * @param input - Input data for the mutation
+     * @param options - Optional mutation configuration
+     * @param options.direct - If true, apply mutation directly without queueing (default: false)
      */
     mutate<M extends InferMutations<Schema<T>>>(
         name: M,
-        input: InferMutationInput<Schema<T>, M>
+        input: InferMutationInput<Schema<T>, M>,
+        options?: MutateOptions
     ): void;
 
     /**
@@ -816,20 +835,37 @@ export function syncEngine<T extends FullSchemaDefinition>(
             return pendingMutations as ReadonlyArray<PendingMutation<T>>;
         },
 
-        mutate(name, input) {
-            // Create mutation metadata
-            const mutation: PendingMutation<T> = {
-                id: createId(),
-                timestamp: Date.now(),
-                name: name as InferMutations<Schema<T>>,
-                input,
-            };
+        mutate(name, input, options) {
+            // Get the mutator handler
+            const mutator = mutators[name];
+            if (!mutator) {
+                throw new Error(`No handler found for mutation '${String(name)}'. This should not happen if the schema was validated correctly.`);
+            }
 
-            // Add to mutations list
-            pendingMutations.push(mutation);
+            // Check if direct mode
+            const direct = options?.direct ?? false;
 
-            // Rebase state
-            rebaseState();
+            if (direct) {
+                // Direct mode: apply mutation immediately without queueing
+                state = produce(state, draft => {
+                    mutator(draft as SyncState<T>, input);
+                }) as SyncState<T>;
+            } else {
+                // Normal mode: add to pending queue and rebase
+                // Create mutation metadata
+                const mutation: PendingMutation<T> = {
+                    id: createId(),
+                    timestamp: Date.now(),
+                    name: name as InferMutations<Schema<T>>,
+                    input,
+                };
+
+                // Add to mutations list
+                pendingMutations.push(mutation);
+
+                // Rebase state
+                rebaseState();
+            }
         },
 
         commit(mutationIds) {

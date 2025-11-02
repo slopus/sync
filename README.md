@@ -8,8 +8,9 @@ A TypeScript-first sync engine with local fields, versioned rebases, and Immer-b
 - **Local Fields** - Client-only fields that never sync to the server (perfect for UI state like `isExpanded`, `isSelected`)
 - **Versioned Rebases** - Last-Write-Wins (LWW) conflict resolution with automatic version tracking
 - **Optimistic Updates** - Apply mutations immediately, rebase when server state changes
+- **Direct Mutations** - Apply mutations without queueing for local-only state changes
 - **Immer Integration** - Immutable state updates with mutable-style API
-- **Direct Mode** - Patch both server and client state directly without reapplying mutations
+- **Direct Rebase Mode** - Patch both server and client state directly without reapplying mutations
 - **Zero Dependencies** - Only requires `immer` and `@paralleldrive/cuid2`
 
 ## Installation
@@ -97,11 +98,17 @@ engine.rebase({
     ],
 });
 
-// Apply local mutation (optimistic update)
+// Apply local mutation (optimistic update - will be sent to server)
 engine.mutate('toggleTodo', { id: 'todo-1' });
 
 // Access current state
 console.log(engine.state.todos['todo-1'].completed); // true
+console.log(engine.pendingMutations.length); // 1
+
+// Apply direct mutation (local-only, not queued)
+engine.mutate('toggleTodo', { id: 'todo-1' }, { direct: true });
+console.log(engine.state.todos['todo-1'].completed); // false
+console.log(engine.pendingMutations.length); // Still 1 (direct mutations don't queue)
 
 // Server confirms the mutation
 engine.rebase({
@@ -210,6 +217,64 @@ engine.rebase({
 }, { allowLocalFields: true });
 ```
 
+### Direct Mutations
+
+Apply mutations directly to client state without adding them to the pending queue. This is perfect for local-only state changes that don't need server confirmation:
+
+```typescript
+const schema = defineSchema({
+    todos: type({
+        fields: {
+            title: field<string>(),
+            completed: field<boolean>(),
+            isExpanded: localField(false),
+        },
+    }),
+}).withMutations({
+    createTodo: mutation((draft, input: { title: string }) => {
+        const id = createId();
+        draft.todos[id] = {
+            id,
+            title: input.title,
+            completed: false,
+            isExpanded: false,
+        };
+    }),
+    toggleExpanded: mutation((draft, input: { id: string }) => {
+        if (draft.todos[input.id]) {
+            draft.todos[input.id].isExpanded = !draft.todos[input.id].isExpanded;
+        }
+    }),
+});
+
+const engine = syncEngine(schema, { from: 'new' });
+
+// Normal mutation - adds to pending queue (will be sent to server)
+engine.mutate('createTodo', { title: 'Buy milk' });
+console.log(engine.pendingMutations.length); // 1
+
+// Direct mutation - applies immediately without queueing
+engine.mutate('toggleExpanded', { id: 'todo-1' }, { direct: true });
+console.log(engine.pendingMutations.length); // Still 1
+
+// State is updated immediately
+console.log(engine.state.todos['todo-1'].isExpanded); // true
+
+// Server state remains unchanged
+console.log(engine.serverState.todos['todo-1']); // undefined (direct mutations don't affect server state)
+```
+
+**When to use direct mutations:**
+- Local-only UI state changes (expand/collapse, selection, etc.)
+- Temporary state that shouldn't be synced
+- Client-side interactions that don't need server confirmation
+
+**Key differences from normal mutations:**
+- Not added to `pendingMutations` queue
+- Not sent to the server
+- Don't affect `serverState`
+- Applied directly to `state` only
+
 ### Rebase Options
 
 Control how `rebase()` updates state:
@@ -301,7 +366,13 @@ type ToggleTodoInput = InferMutationInput<typeof schema, 'toggleTodo'>;
     - `{ from: 'new', objects?: {...} }` - Start with fresh state (objects optional if no singletons)
     - `{ from: 'restore', data: string }` - Restore from persisted state
 - `engine.rebase(update, options?)` - Apply server updates
-- `engine.mutate(name, input)` - Apply optimistic mutation (handler must be defined in schema)
+  - `options`: Rebase options
+    - `allowServerFields?: boolean` - Allow updating synced fields (default: true)
+    - `allowLocalFields?: boolean` - Allow updating local fields (default: false)
+    - `direct?: boolean` - Patch both states directly without reapplying mutations (default: false)
+- `engine.mutate(name, input, options?)` - Apply optimistic mutation (handler must be defined in schema)
+  - `options`: Mutation options
+    - `direct?: boolean` - Apply directly without queueing (default: false)
 - `engine.commit(mutationIds)` - Mark mutations as confirmed by server
 - `engine.persist()` - Serialize state for persistence (returns string)
 - `engine.state` - Current client state (with mutations applied)
