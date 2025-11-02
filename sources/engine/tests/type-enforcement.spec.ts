@@ -13,7 +13,7 @@ describe('Type Enforcement', () => {
                     fields: {
                         title: field<string>(),
                     },
-                    versioned: true as const,
+                    versioned: true,
                 }),
             }
         });
@@ -35,14 +35,13 @@ describe('Type Enforcement', () => {
         expect(_assertVersionRequired).toBe(true);
     });
 
-    it('should prohibit version field when versioned=false', () => {
+    it('should prohibit version field when versioned is omitted', () => {
         const schema = defineSchema({
             types: {
                 settings: type({
                     fields: {
                         theme: field<string>(),
                     },
-                    versioned: false as const,
                 }),
             }
         });
@@ -50,7 +49,7 @@ describe('Type Enforcement', () => {
         type SchemaType = typeof schema._schema;
         type UpdateType = PartialServerUpdate<SchemaType>;
 
-        // When versioned=false, version should be prohibited
+        // When versioned is omitted, version should be prohibited
         // This should be valid - no version field
         const withoutVersion: UpdateType = {
             settings: [{
@@ -62,7 +61,7 @@ describe('Type Enforcement', () => {
         const withVersion: UpdateType = {
             settings: [{
                 id: 'settings-1',
-                // @ts-expect-error - version is prohibited when versioned=false
+                // @ts-expect-error - version is prohibited when versioned is omitted
                 version: 1,
                 theme: 'dark',
             }],

@@ -9,7 +9,7 @@ import {
     type,
     field,
     localField,
-    sync,
+    syncEngine,
     type InferCreate,
     type InferUpdate,
     type InferItem,
@@ -163,7 +163,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // Server doesn't include local fields
             engine.rebase({
@@ -199,7 +199,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.addMutator('toggleExpanded', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -256,7 +256,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.addMutator('toggleSelection', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -308,7 +308,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.addMutator('expand', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -368,7 +368,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.rebase({
                 items: [{

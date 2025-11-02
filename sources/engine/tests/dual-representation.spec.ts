@@ -10,7 +10,7 @@ import {
     type,
     field,
     reference,
-    sync,
+    syncEngine,
     localField,
 } from '../index';
 
@@ -24,13 +24,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             completed: field<boolean>(),
                         },
-                        versioned: false as const, // Disabled
+                        // versioned omitted - disabled
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // First update
             engine.rebase({
@@ -65,13 +65,13 @@ describe('Dual-Representation Architecture', () => {
                         fields: {
                             title: field<string>(),
                         },
-                        versioned: false as const,
+                        // versioned omitted - disabled
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.rebase({
                 todos: [{
@@ -105,13 +105,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             completed: field<boolean>(),
                         },
-                        versioned: true as const, // Enabled
+                        versioned: true, // Enabled
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // First update with version 1
             vi.setSystemTime(1000);
@@ -151,13 +151,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             completed: field<boolean>(),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // First update with version 3 (arrives first but is newer)
             vi.setSystemTime(3000);
@@ -198,13 +198,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             completed: field<boolean>(),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // Initial state with version 1
             vi.setSystemTime(1000);
@@ -266,20 +266,20 @@ describe('Dual-Representation Architecture', () => {
                         fields: {
                             name: field<string>(),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                     todos: type({
                         fields: {
                             title: field<string>(),
                             assignedTo: reference('users'),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // Create user with version 1
             vi.setSystemTime(1000);
@@ -330,13 +330,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             completed: field<boolean>(),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.rebase({
                 todos: [{
@@ -364,7 +364,7 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             completed: field<boolean>(),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {
@@ -375,7 +375,7 @@ describe('Dual-Representation Architecture', () => {
                 },
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.addMutator('updateTodo', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -418,13 +418,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             isExpanded: localField(false),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             engine.rebase({
                 todos: [{
@@ -450,13 +450,13 @@ describe('Dual-Representation Architecture', () => {
                             title: field<string>(),
                             isExpanded: localField(false),
                         },
-                        versioned: true as const,
+                        versioned: true,
                     }),
                 },
                 mutations: {},
             });
 
-            const engine = sync(schema);
+            const engine = syncEngine(schema);
 
             // Create todo with default local field at t=1000
             vi.setSystemTime(1000);

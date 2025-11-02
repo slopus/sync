@@ -211,19 +211,29 @@ export interface CollectionType<
  *   })
  * });
  */
-export function type<
-    TFields extends CollectionSchema,
-    TVersioned extends boolean = false
->(
+export function type<TFields extends CollectionSchema>(
     config: {
         fields: ValidateNoReservedFields<TFields>;
-        versioned?: TVersioned;
+        versioned: true;
     }
-): CollectionType<TFields, TVersioned> {
+): CollectionType<TFields, true>;
+
+export function type<TFields extends CollectionSchema>(
+    config: {
+        fields: ValidateNoReservedFields<TFields>;
+    }
+): CollectionType<TFields, false>;
+
+export function type<TFields extends CollectionSchema>(
+    config: {
+        fields: ValidateNoReservedFields<TFields>;
+        versioned?: true;
+    }
+): CollectionType<TFields, boolean> {
     return {
         _tag: 'CollectionType',
         fields: config.fields as TFields,
-        versioned: (config.versioned ?? false) as TVersioned,
+        versioned: (config.versioned ?? false) as boolean,
     };
 }
 

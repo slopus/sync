@@ -208,7 +208,7 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
 /**
  * Create a sync engine for the given schema
  */
-export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEngine<T> {
+export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEngine<T> {
 
     // Create empty initial state (client representation)
     const createEmptyState = (): SyncState<T> => {

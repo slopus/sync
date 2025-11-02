@@ -45,5 +45,5 @@ export type {
 } from './schema';
 
 // Sync Engine
-export { sync } from './sync';
-export type { SyncState, ServerSnapshot, SyncEngine, PartialServerUpdate, PendingMutation } from './sync';
+export { syncEngine } from './engine';
+export type { SyncState, ServerSnapshot, SyncEngine, PartialServerUpdate, PendingMutation } from './engine';
