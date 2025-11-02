@@ -1,14 +1,46 @@
 {
-  "name": "happy-sync",
-  "version": "1.0.0",
-  "main": "index.js",
-  "repository": "https://github.com/slopus/sync.git",
+  "name": "@slopus/sync",
+  "version": "0.0.1",
+  "description": "A TypeScript sync engine with local fields, versioned rebases, and Immer-based state management",
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/slopus/sync.git"
+  },
+  "homepage": "https://github.com/slopus/sync#readme",
+  "bugs": {
+    "url": "https://github.com/slopus/sync/issues"
+  },
+  "keywords": [
+    "sync",
+    "state-management",
+    "typescript",
+    "immer",
+    "crdt",
+    "optimistic-updates",
+    "rebase",
+    "local-fields"
+  ],
   "author": "Steve Korshakov <steve@korshakov.com>",
   "license": "MIT",
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc",
     "start": "tsx ./sources/main.ts",
-    "test": "tsc --noEmit && vitest run"
+    "test": "tsc --noEmit && vitest run",
+    "prepublishOnly": "yarn build && yarn test"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",
@@ -18,11 +50,14 @@
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.3"
+    "vitest": "^4.0.3",
+    "zod": "^4.1.12"
   },
   "dependencies": {
     "@paralleldrive/cuid2": "^3.1.0",
-    "immer": "^10.2.0",
-    "zod": "^4.1.12"
+    "immer": "^10.2.0"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
   }
 }
