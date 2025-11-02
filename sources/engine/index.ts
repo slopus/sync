@@ -50,6 +50,7 @@ export type {
     InferMutationInput,
     InferMutationOutput,
     InferMutations,
+    InferSchema,
     ExtractObjectTypes,
     InferInitialObjectValues,
     ExtractSchemaDefinition,

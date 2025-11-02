@@ -484,6 +484,27 @@ export type ExtractSchemaDefinition<T> = T extends Schema<infer S>
             : never;
 
 /**
+ * Infer the full schema definition (types + mutations) from a Schema
+ *
+ * Returns the complete schema definition including both types and mutations.
+ *
+ * @example
+ * const schema = defineSchema({
+ *   todos: type({ fields: { title: field<string>() } })
+ * }).withMutations({
+ *   createTodo: mutation((draft, input: { title: string }) => {})
+ * });
+ *
+ * type SchemaType = InferSchema<typeof schema>;
+ * // { types: { todos: ... }, mutations: { createTodo: ... } }
+ */
+export type InferSchema<T> = T extends Schema<infer S>
+    ? S
+    : T extends FullSchemaDefinition
+        ? T
+        : never;
+
+/**
  * Infer all collection names from a schema as a union type
  *
  * Returns a union of all collection names defined in the schema.
