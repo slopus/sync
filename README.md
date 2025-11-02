@@ -25,8 +25,9 @@ Note: `zod` is a peer dependency used for mutation validation.
 ### 1. Define Your Schema
 
 ```typescript
-import { defineSchema, type, field, localField, reference } from '@slopus/sync';
+import { defineSchema, type, field, localField, reference, mutation } from '@slopus/sync';
 import { z } from 'zod';
+import { createId } from '@paralleldrive/cuid2';
 
 const schema = defineSchema({
     types: {
@@ -46,13 +47,30 @@ const schema = defineSchema({
         }),
     },
     mutations: {
-        createTodo: z.object({
-            title: z.string(),
-            assignedTo: z.string().nullable(),
-        }),
-        toggleTodo: z.object({
-            id: z.string(),
-        }),
+        createTodo: mutation(
+            z.object({
+                title: z.string(),
+                assignedTo: z.string().nullable(),
+            }),
+            (draft, input) => {
+                const id = createId();
+                draft.todos[id] = {
+                    id,
+                    title: input.title,
+                    completed: false,
+                    assignedTo: input.assignedTo,
+                    isExpanded: false, // local field gets default value
+                };
+            }
+        ),
+        toggleTodo: mutation(
+            z.object({ id: z.string() }),
+            (draft, input) => {
+                if (draft.todos[input.id]) {
+                    draft.todos[input.id].completed = !draft.todos[input.id].completed;
+                }
+            }
+        ),
     },
 });
 ```
@@ -62,26 +80,11 @@ const schema = defineSchema({
 ```typescript
 import { syncEngine } from '@slopus/sync';
 
-// For schemas with only collections, pass empty object
-const engine = syncEngine(schema, {});
+// For schemas with only collections, objects is optional
+const engine = syncEngine(schema, { from: 'new' });
 
-// Register mutation handlers
-engine.addMutator('createTodo', (draft, input) => {
-    const id = createId();
-    draft.todos[id] = {
-        id,
-        title: input.title,
-        completed: false,
-        assignedTo: input.assignedTo,
-        isExpanded: false, // local field gets default value
-    };
-});
-
-engine.addMutator('toggleTodo', (draft, input) => {
-    if (draft.todos[input.id]) {
-        draft.todos[input.id].completed = !draft.todos[input.id].completed;
-    }
-});
+// Mutation handlers are already registered from the schema!
+// No need to call addMutator() - they're defined inline with mutations
 ```
 
 ### 3. Use the Engine
@@ -110,7 +113,10 @@ engine.rebase({
     ],
 });
 
-// Pending mutation is now cleared
+// Commit the pending mutation
+const mutationId = engine.pendingMutations[0].id;
+engine.commit(mutationId);
+
 console.log(engine.pendingMutations); // []
 ```
 
@@ -140,20 +146,26 @@ const schema = defineSchema({
         }),
     },
     mutations: {
-        // Define mutation schemas with Zod
-        updateTheme: z.object({
-            theme: z.enum(['light', 'dark']),
-        }),
+        // Define mutations with schema and handler
+        updateTheme: mutation(
+            z.object({ theme: z.enum(['light', 'dark']) }),
+            (draft, input) => {
+                draft.settings.theme = input.theme;
+            }
+        ),
     },
 });
 
 // Singleton objects require initial values
 const engine = syncEngine(schema, {
-    settings: {
-        theme: 'light',
-        notifications: true,
-    }
-    // Collections (like 'posts') are not included - they start empty
+    from: 'new',
+    objects: {
+        settings: {
+            theme: 'light',
+            notifications: true,
+        },
+        // Collections (like 'posts') are not included - they start empty
+    },
 });
 
 // Access singleton directly (no ID indexing)
@@ -184,10 +196,19 @@ const schema = defineSchema({
             },
         }),
     },
-    mutations: {},
+    mutations: {
+        toggleExpanded: mutation(
+            z.object({ id: z.string() }),
+            (draft, input) => {
+                if (draft.items[input.id]) {
+                    draft.items[input.id].isExpanded = !draft.items[input.id].isExpanded;
+                }
+            }
+        ),
+    },
 });
 
-const engine = syncEngine(schema, {}); // Collections only, no initial values needed
+const engine = syncEngine(schema, { from: 'new' }); // Collections only, objects optional
 
 // Server updates ignore local fields
 engine.rebase({
@@ -230,10 +251,19 @@ const schema = defineSchema({
             versioned: true, // ← enables $version tracking
         }),
     },
-    mutations: {},
+    mutations: {
+        updateContent: mutation(
+            z.object({ id: z.string(), content: z.string() }),
+            (draft, input) => {
+                if (draft.docs[input.id]) {
+                    draft.docs[input.id].content = input.content;
+                }
+            }
+        ),
+    },
 });
 
-const engine = syncEngine(schema, {}); // Collections only
+const engine = syncEngine(schema, { from: 'new' }); // Collections only
 
 // Server sends updates with $version
 engine.rebase({
@@ -278,16 +308,18 @@ type ToggleTodoInput = InferMutationInput<typeof schema, 'toggleTodo'>;
 - `field<T>()` - Define a synced field
 - `localField<T>(defaultValue)` - Define a local-only field
 - `reference(collection, nullable)` - Define a reference field
+- `mutation(schema, handler)` - Define a mutation with Zod schema and handler function
 
 ### Sync Engine
 
-- `syncEngine(schema, initialValues)` - Create a new sync engine instance
-  - `initialValues`: Required initial values for singleton objects (object() types)
-  - Pass `{}` if schema has only collections, no singletons
-  - Local fields are initialized automatically with their defaults
+- `syncEngine(schema, init)` - Create a new sync engine instance
+  - `init`: Initialization parameter
+    - `{ from: 'new', objects?: {...} }` - Start with fresh state (objects optional if no singletons)
+    - `{ from: 'restore', data: string }` - Restore from persisted state
 - `engine.rebase(update, options?)` - Apply server updates
-- `engine.mutate(name, input)` - Apply optimistic mutation
-- `engine.addMutator(name, handler)` - Register mutation handler
+- `engine.mutate(name, input)` - Apply optimistic mutation (handler must be defined in schema)
+- `engine.commit(mutationIds)` - Mark mutations as confirmed by server
+- `engine.persist()` - Serialize state for persistence (returns string)
 - `engine.state` - Current client state (with mutations applied)
 - `engine.serverState` - Server snapshot (before mutations)
 - `engine.pendingMutations` - Array of unconfirmed mutations
