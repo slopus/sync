@@ -8,7 +8,8 @@ export type {
     Timestamp,
     OperationId,
     FieldValue,
-    Version
+    Version,
+    PersistedState
 } from './types';
 
 // Schema DSL
@@ -19,6 +20,7 @@ export {
     field,
     local as localField,
     reference,
+    mutation,
 } from './schema';
 export type {
     FieldType,
@@ -31,6 +33,8 @@ export type {
     ObjectType,
     SchemaDefinition,
     MutationDefinition,
+    MutationDescriptor,
+    MutationHandler,
     FullSchemaDefinition,
     Schema,
     InferCreate,
@@ -63,5 +67,6 @@ export type {
     FullUpdate,
     FullLocalUpdate,
     PendingMutation,
-    RebaseOptions
+    RebaseOptions,
+    InitParam
 } from './engine';

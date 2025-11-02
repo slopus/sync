@@ -11,6 +11,7 @@ import {
     field,
     localField,
     syncEngine,
+    mutation,
     type InferCreate,
     type InferUpdate,
     type InferItem,
@@ -162,7 +163,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Server doesn't include local fields
             engine.rebase({
@@ -190,20 +191,21 @@ describe('Local Fields', () => {
                     }),
                 },
                 mutations: {
-                    toggleExpanded: z.object({
-                        id: z.string(),
-                        isExpanded: z.boolean(),
-                    }),
+                    toggleExpanded: mutation(
+                        z.object({
+                            id: z.string(),
+                            isExpanded: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].isExpanded = input.isExpanded;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('toggleExpanded', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].isExpanded = input.isExpanded;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create initial item
             engine.rebase({
@@ -246,20 +248,21 @@ describe('Local Fields', () => {
                     }),
                 },
                 mutations: {
-                    toggleSelection: z.object({
-                        id: z.string(),
-                        isSelected: z.boolean(),
-                    }),
+                    toggleSelection: mutation(
+                        z.object({
+                            id: z.string(),
+                            isSelected: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].isSelected = input.isSelected;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('toggleSelection', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].isSelected = input.isSelected;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create item from server
             engine.rebase({
@@ -294,29 +297,31 @@ describe('Local Fields', () => {
                     }),
                 },
                 mutations: {
-                    expand: z.object({
-                        id: z.string(),
-                    }),
-                    updatePriority: z.object({
-                        id: z.string(),
-                        priority: z.number(),
-                    }),
+                    expand: mutation(
+                        z.object({
+                            id: z.string(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].isExpanded = true;
+                            }
+                        }
+                    ),
+                    updatePriority: mutation(
+                        z.object({
+                            id: z.string(),
+                            priority: z.number(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].priority = input.priority;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('expand', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].isExpanded = true;
-                }
-            });
-
-            engine.addMutator('updatePriority', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].priority = input.priority;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Initial server state
             engine.rebase({
@@ -363,7 +368,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.rebase({
                 items: [{
@@ -394,7 +399,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create item with default local field
             engine.rebase({
@@ -431,7 +436,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.rebase({
                 todos: [{
@@ -468,7 +473,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.rebase({
                 todos: [{
@@ -504,7 +509,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.rebase({
                 todos: [{
@@ -538,17 +543,18 @@ describe('Local Fields', () => {
                     }),
                 },
                 mutations: {
-                    toggleCompleted: z.object({ id: z.string() }),
+                    toggleCompleted: mutation(
+                        z.object({ id: z.string() }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].completed = !draft.todos[input.id].completed;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('toggleCompleted', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = !draft.todos[input.id].completed;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create item
             engine.rebase({
@@ -594,8 +600,11 @@ describe('Local Fields', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'light',
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'light',
+                    },
                 },
             });
 
@@ -632,7 +641,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.rebase({
                 todos: [{

@@ -46,3 +46,23 @@ export interface FieldValue<T> {
  * Monotonically increasing number
  */
 export type Version = number;
+
+// ============================================================================
+// Persistence Types
+// ============================================================================
+
+/**
+ * Serialized state format for persistence
+ * Contains server snapshot and pending mutations needed to fully restore engine state
+ *
+ * The persisted data can be stringified and stored, then later used to restore
+ * the sync engine to its exact state at the time of persistence.
+ *
+ * @typeParam T - The full schema definition
+ */
+export interface PersistedState<T> {
+    /** Server snapshot with wrapped field values and versions */
+    serverSnapshot: T;
+    /** Pending mutations waiting for server confirmation */
+    pendingMutations: unknown[];
+}

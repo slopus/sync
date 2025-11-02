@@ -316,12 +316,65 @@ export type SchemaDefinition = {
 // ============================================================================
 
 /**
+ * Mutation handler function that applies a mutation to the state
+ * Uses Immer for immutable updates - mutate the draft directly
+ *
+ * The handler receives:
+ * - draft: Mutable draft of the current state (via Immer)
+ * - input: The validated input data for this mutation
+ *
+ * Note: The draft parameter is typed as `any` to allow flexible usage.
+ * Type safety is provided by the schema definition and TypeScript inference.
+ */
+export type MutationHandler<TInput> = (
+    draft: any,
+    input: TInput
+) => void;
+
+/**
+ * Single mutation descriptor containing both schema and handler
+ */
+export interface MutationDescriptor<TInput> {
+    /** Zod schema for validating mutation input */
+    schema: z.ZodType<TInput>;
+    /** Handler function that applies the mutation to state */
+    handler: MutationHandler<TInput>;
+}
+
+/**
  * Mutation definition
- * Maps mutation names to their Zod schema types
+ * Maps mutation names to their descriptors (schema + handler)
  */
 export type MutationDefinition = {
-    [mutationName: string]: z.ZodTypeAny;
+    [mutationName: string]: MutationDescriptor<any>;
 };
+
+/**
+ * Create a mutation descriptor with schema and handler
+ *
+ * @param schema - Zod schema for validating mutation input
+ * @param handler - Handler function that applies the mutation to state
+ * @returns Mutation descriptor
+ *
+ * @example
+ * const schema = defineSchema({
+ *   types: { todos: type({ fields: { title: field<string>() } }) },
+ *   mutations: {
+ *     createTodo: mutation(
+ *       z.object({ id: z.string(), title: z.string() }),
+ *       (draft, input) => {
+ *         draft.todos[input.id] = { id: input.id, title: input.title };
+ *       }
+ *     )
+ *   }
+ * });
+ */
+export function mutation<TInput>(
+    schema: z.ZodType<TInput>,
+    handler: MutationHandler<TInput>
+): MutationDescriptor<TInput> {
+    return { schema, handler };
+}
 
 /**
  * Complete schema with types and mutations
@@ -388,7 +441,7 @@ export type Schema<T extends FullSchemaDefinition> = {
     collection<K extends keyof T['types']>(name: K): T['types'][K] extends CollectionType<infer TFields> ? TFields : never;
 
     /**
-     * Get the Zod schema for a specific mutation
+     * Get the mutation descriptor for a specific mutation
      */
     mutation<K extends keyof NonNullable<T['mutations']>>(name: K): NonNullable<T['mutations']>[K];
 
@@ -788,7 +841,10 @@ type ExtractMutationDefinition<T> = T extends Schema<infer S>
  * const schema = defineSchema({
  *   types: { ... },
  *   mutations: {
- *     createTodo: z.object({ title: z.string(), completed: z.boolean() }),
+ *     createTodo: mutation(
+ *       z.object({ title: z.string(), completed: z.boolean() }),
+ *       (draft, input) => { ... }
+ *     )
  *   }
  * });
  *
@@ -796,8 +852,8 @@ type ExtractMutationDefinition<T> = T extends Schema<infer S>
  * // { title: string; completed: boolean }
  */
 export type InferMutationInput<TSchema, TMutation extends keyof NonNullable<ExtractMutationDefinition<TSchema>>> =
-    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends z.ZodTypeAny
-        ? z.input<NonNullable<ExtractMutationDefinition<TSchema>>[TMutation]>
+    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends MutationDescriptor<infer TInput>
+        ? TInput
         : never;
 
 /**
@@ -809,7 +865,10 @@ export type InferMutationInput<TSchema, TMutation extends keyof NonNullable<Extr
  * const schema = defineSchema({
  *   types: { ... },
  *   mutations: {
- *     createTodo: z.object({ title: z.string(), completed: z.boolean().default(false) }),
+ *     createTodo: mutation(
+ *       z.object({ title: z.string(), completed: z.boolean().default(false) }),
+ *       (draft, input) => { ... }
+ *     )
  *   }
  * });
  *
@@ -817,8 +876,8 @@ export type InferMutationInput<TSchema, TMutation extends keyof NonNullable<Extr
  * // { title: string; completed: boolean }
  */
 export type InferMutationOutput<TSchema, TMutation extends keyof NonNullable<ExtractMutationDefinition<TSchema>>> =
-    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends z.ZodTypeAny
-        ? z.output<NonNullable<ExtractMutationDefinition<TSchema>>[TMutation]>
+    NonNullable<ExtractMutationDefinition<TSchema>>[TMutation] extends MutationDescriptor<infer TInput>
+        ? TInput
         : never;
 
 /**
@@ -937,8 +996,18 @@ export type InitialObjectValuesParam<T extends FullSchemaDefinition> =
  *     })
  *   },
  *   mutations: {
- *     createTodo: z.object({ title: z.string() }),
- *     updateTodo: z.object({ id: z.string(), title: z.string().optional() })
+ *     createTodo: mutation(
+ *       z.object({ id: z.string(), title: z.string() }),
+ *       (draft, input) => {
+ *         draft.todos[input.id] = { id: input.id, title: input.title };
+ *       }
+ *     ),
+ *     updateTodo: mutation(
+ *       z.object({ id: z.string(), title: z.string() }),
+ *       (draft, input) => {
+ *         draft.todos[input.id].title = input.title;
+ *       }
+ *     )
  *   }
  * });
  *

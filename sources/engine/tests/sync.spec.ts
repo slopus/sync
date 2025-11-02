@@ -10,6 +10,7 @@ import {
     field,
     reference,
     syncEngine,
+    mutation,
 } from '../index';
 
 describe('Sync Engine', () => {
@@ -25,15 +26,18 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {}
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             expect(engine.state).toBeDefined();
             expect(engine.serverState).toBeDefined();
@@ -51,11 +55,14 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({ id: z.string(), title: z.string() }),
+                    createTodo: mutation(
+                        z.object({ id: z.string(), title: z.string() }),
+                        (draft, input) => {}
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             type ExpectedState = {
                 todos: Record<string, {
@@ -79,21 +86,22 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Initially empty
             expect(engine.pendingMutations).toHaveLength(0);
@@ -124,21 +132,22 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Apply mutations
             engine.mutate('createTodo', { id: 'todo-1', title: 'Test 1' });
@@ -169,21 +178,22 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', { id: 'todo-1', title: 'Test' });
 
@@ -207,39 +217,42 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    updateTodo: z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    deleteTodo: z.object({
-                        id: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                                completed: false,
+                            };
+                        }
+                    ),
+                    updateTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].completed = input.completed;
+                            }
+                        }
+                    ),
+                    deleteTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                        }),
+                        (draft, input) => {
+                            delete draft.todos[input.id];
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                    completed: false,
-                };
-            });
-
-            engine.addMutator('updateTodo', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = input.completed;
-                }
-            });
-
-            engine.addMutator('deleteTodo', (draft, input) => {
-                delete draft.todos[input.id];
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', { id: 'todo-1', title: 'Test' });
             engine.mutate('updateTodo', { id: 'todo-1', completed: true });
@@ -278,35 +291,36 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        priority: z.number(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            priority: z.number(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                                priority: input.priority,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                    priority: input.priority,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', { id: 'todo-1', title: 'Test', priority: 5 });
 
-            const mutation = engine.pendingMutations[0];
+            const pendingMutation = engine.pendingMutations[0];
 
             // Type checking
-            expectTypeOf(mutation.input).toEqualTypeOf<{ id: string; title: string; priority: number }>();
+            expectTypeOf(pendingMutation.input).toEqualTypeOf<{ id: string; title: string; priority: number }>();
 
             // Runtime access
-            expect(mutation.input.id).toBe('todo-1');
-            expect(mutation.input.title).toBe('Test');
-            expect(mutation.input.priority).toBe(5);
+            expect(pendingMutation.input.id).toBe('todo-1');
+            expect(pendingMutation.input.title).toBe('Test');
+            expect(pendingMutation.input.priority).toBe(5);
         });
     });
 
@@ -322,24 +336,25 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            const data = input as { id: string; title: string; completed: boolean };
+                            draft.todos[data.id] = {
+                                id: data.id,
+                                title: data.title,
+                                completed: data.completed,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                const data = input as { id: string; title: string; completed: boolean };
-                draft.todos[data.id] = {
-                    id: data.id,
-                    title: data.title,
-                    completed: data.completed,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Should not throw
             expect(true).toBe(true);
@@ -356,24 +371,25 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            const data = input as { id: string; title: string; completed: boolean };
+                            draft.todos[data.id] = {
+                                id: data.id,
+                                title: data.title,
+                                completed: data.completed,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                const data = input as { id: string; title: string; completed: boolean };
-                draft.todos[data.id] = {
-                    id: data.id,
-                    title: data.title,
-                    completed: data.completed,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', {
                 id: 'todo-1',
@@ -397,33 +413,35 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    updateTodo: z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                                completed: input.completed,
+                            };
+                        }
+                    ),
+                    updateTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].completed = input.completed;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                    completed: input.completed,
-                };
-            });
-
-            engine.addMutator('updateTodo', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = input.completed;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', {
                 id: 'todo-1',
@@ -451,10 +469,11 @@ describe('Sync Engine', () => {
                         },
                     }),
                 },
-                mutations: {},
+                mutations: {
+                },
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create initial item with full data
             engine.rebase({
@@ -494,7 +513,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Try to create new item with missing fields
             engine.rebase({
@@ -522,7 +541,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create new item with all fields
             engine.rebase({
@@ -551,7 +570,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema, {});
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Create item with null description
             engine.rebase({
@@ -586,20 +605,21 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    updateTodo: z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    updateTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].completed = input.completed;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('updateTodo', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = input.completed;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Update server state with a todo
             engine.rebase({
@@ -636,20 +656,21 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    updateTodo: z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    updateTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].completed = input.completed;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('updateTodo', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = input.completed;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Initial server state
             engine.rebase({
@@ -693,33 +714,35 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    updateTodo: z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                                completed: input.completed,
+                            };
+                        }
+                    ),
+                    updateTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].completed = input.completed;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                    completed: input.completed,
-                };
-            });
-
-            engine.addMutator('updateTodo', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].completed = input.completed;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Set up server state
             engine.rebase({
@@ -771,21 +794,22 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', { id: 'todo-1', title: 'Test' });
             expect(engine.state.todos['todo-1']).toBeDefined();
@@ -807,20 +831,21 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    updateTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
+                    updateTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            if (draft.todos[input.id]) {
+                                draft.todos[input.id].title = input.title;
+                            }
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('updateTodo', (draft, input) => {
-                if (draft.todos[input.id]) {
-                    draft.todos[input.id].title = input.title;
-                }
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Setup server state
             engine.rebase({
@@ -859,23 +884,24 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            completed: z.boolean(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                                completed: input.completed,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                    completed: input.completed,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // Capture mutation ID by inspecting state before/after
             const beforeMutationCount = Object.keys(engine.state.todos).length;
@@ -914,21 +940,22 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             // This should type-check correctly
             engine.mutate('createTodo', {
@@ -961,23 +988,24 @@ describe('Sync Engine', () => {
                     }),
                 },
                 mutations: {
-                    createTodo: z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        assignedTo: z.string(),
-                    }),
+                    createTodo: mutation(
+                        z.object({
+                            id: z.string(),
+                            title: z.string(),
+                            assignedTo: z.string(),
+                        }),
+                        (draft, input) => {
+                            draft.todos[input.id] = {
+                                id: input.id,
+                                title: input.title,
+                                assignedTo: input.assignedTo,
+                            };
+                        }
+                    ),
                 },
             });
 
-            const engine = syncEngine(schema, {});
-
-            engine.addMutator('createTodo', (draft, input) => {
-                draft.todos[input.id] = {
-                    id: input.id,
-                    title: input.title,
-                    assignedTo: input.assignedTo,
-                };
-            });
+            const engine = syncEngine(schema, { from: 'new' });
 
             engine.mutate('createTodo', {
                 id: 'todo-1',

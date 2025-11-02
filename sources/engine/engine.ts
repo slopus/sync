@@ -1,7 +1,7 @@
 import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ObjectType, ExtractSchemaDefinition, InferObjectState, InferServerObjectState, CollectionSchema, InferFieldValue, ServerFieldsOnly, LocalFieldsOnly, ServerAndLocalFields, ExtractFields, InitialObjectValuesParam } from "./schema";
 import { produce } from 'immer';
 import { createId } from '@paralleldrive/cuid2';
-import { FieldValue } from "./types";
+import { FieldValue, PersistedState } from "./types";
 
 /**
  * Helper type to check if a collection or object has versioning enabled
@@ -97,6 +97,18 @@ export type PendingMutation<T extends FullSchemaDefinition> = {
         readonly input: InferMutationInput<Schema<T>, M>;
     }
 }[InferMutations<Schema<T>>];
+
+/**
+ * Initialization parameter for syncEngine()
+ * Supports two modes:
+ * - 'new': Start with fresh state and provided initial object values (objects is optional if no singletons)
+ * - 'restore': Restore from previously persisted state
+ */
+export type InitParam<T extends FullSchemaDefinition> =
+    | (InitialObjectValuesParam<T> extends Record<string, never>
+        ? { from: 'new'; objects?: InitialObjectValuesParam<T> }
+        : { from: 'new'; objects: InitialObjectValuesParam<T> })
+    | { from: 'restore'; data: string };
 
 /**
  * Mutator function that applies a mutation to the state
@@ -277,19 +289,13 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
      * Apply a mutation locally
      * Creates a mutation ID and timestamp, adds to pending list, and rebases state
      * This mutation will be sent to the server
+     *
+     * The mutation handler must be defined in the schema.
+     * If no handler is found, an error will be thrown.
      */
     mutate<M extends InferMutations<Schema<T>>>(
         name: M,
         input: InferMutationInput<Schema<T>, M>
-    ): void;
-
-    /**
-     * Register a mutation handler
-     * The handler receives an Immer draft and should mutate it directly
-     */
-    addMutator<M extends InferMutations<Schema<T>>>(
-        name: M,
-        handler: (draft: SyncState<T>, input: InferMutationInput<Schema<T>, M>) => void
     ): void;
 
     /**
@@ -317,14 +323,30 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
      * @param options.direct - Skip full state rebase (default: false)
      */
     rebase(partialUpdate: PartialUpdate<T>, options?: RebaseOptions): void;
+
+    /**
+     * Serialize current engine state for persistence
+     * Returns stringified server snapshot + pending mutations
+     *
+     * The returned string can be stored and later used with
+     * syncEngine({ from: 'restore', data: persistedData })
+     * to restore the exact state of the engine
+     *
+     * @returns Stringified persisted state
+     */
+    persist(): string;
 }
 
 /**
  * Create a sync engine for the given schema
+ *
+ * Supports two initialization modes:
+ * - New: `{ from: 'new', objects: {...} }` - Start with fresh state (objects optional if no singletons)
+ * - Restore: `{ from: 'restore', data: persistedData }` - Restore from persisted state
  */
 export function syncEngine<T extends FullSchemaDefinition>(
     schema: Schema<T>,
-    initialValues: InitialObjectValuesParam<T>
+    init: InitParam<T>
 ): SyncEngine<T> {
 
     // Create initial state (client representation) with provided object values
@@ -405,13 +427,6 @@ export function syncEngine<T extends FullSchemaDefinition>(
         return emptySnapshot;
     };
 
-    // Internal state
-    let serverSnapshot: ServerSnapshot<T> = createEmptySnapshot(initialValues);
-    let state: SyncState<T> = createEmptyState(initialValues);
-    // Pending mutations waiting for server confirmation
-    const pendingMutations: PendingMutation<T>[] = [];
-    const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;
-
     /**
      * Unwrap server snapshot to client state
      * Converts FieldValue<T> to plain T for all fields except id and version
@@ -429,12 +444,15 @@ export function syncEngine<T extends FullSchemaDefinition>(
                 const serverObject = snapshot[typeKey] as Record<string, unknown>;
                 const clientObject: Record<string, unknown> = {};
 
-                // Unwrap all fields (skip version)
+                // Unwrap all fields, preserve $version if present
                 for (const fieldName in serverObject) {
-                    if (fieldName === '$version') continue; // Skip version field
-
-                    const fieldValue = serverObject[fieldName] as FieldValue<unknown>;
-                    clientObject[fieldName] = fieldValue.value;
+                    if (fieldName === '$version') {
+                        // $version is not wrapped, copy it directly
+                        clientObject[fieldName] = serverObject[fieldName];
+                    } else {
+                        const fieldValue = serverObject[fieldName] as FieldValue<unknown>;
+                        clientObject[fieldName] = fieldValue.value;
+                    }
                 }
 
                 clientState[typeKey] = clientObject as InferStateForType<T, typeof typeKey>;
@@ -449,12 +467,18 @@ export function syncEngine<T extends FullSchemaDefinition>(
                         id: serverItem.id, // id is not wrapped
                     };
 
-                    // Unwrap all other fields (skip id and version)
+                    // Unwrap all other fields (skip id, but preserve $version)
                     for (const fieldName in serverItem) {
-                        if (fieldName === 'id' || fieldName === '$version') continue; // Skip unwrapped fields
+                        if (fieldName === 'id') continue; // id is already added
 
-                        const fieldValue = serverItem[fieldName] as FieldValue<unknown>;
-                        clientItem[fieldName] = fieldValue.value;
+                        if (fieldName === '$version') {
+                            // $version is not wrapped, copy it directly
+                            clientItem[fieldName] = serverItem[fieldName];
+                        } else {
+                            // Regular fields are wrapped
+                            const fieldValue = serverItem[fieldName] as FieldValue<unknown>;
+                            clientItem[fieldName] = fieldValue.value;
+                        }
                     }
 
                     clientItems[itemId] = clientItem;
@@ -466,6 +490,42 @@ export function syncEngine<T extends FullSchemaDefinition>(
 
         return clientState;
     };
+
+    // Internal state - initialized based on mode
+    let serverSnapshot: ServerSnapshot<T>;
+    let state: SyncState<T>;
+    const pendingMutations: PendingMutation<T>[] = [];
+    const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;
+
+    // Auto-register mutation handlers from schema
+    if (schema._schema.mutations) {
+        for (const mutationName in schema._schema.mutations) {
+            const descriptor = schema._schema.mutations[mutationName];
+            if (!descriptor || !descriptor.handler) {
+                throw new Error(`Mutation '${mutationName}' is missing a handler. All mutations must have handlers defined in the schema.`);
+            }
+            mutators[mutationName as InferMutations<Schema<T>>] = descriptor.handler as Mutator<T>;
+        }
+    }
+
+    // Initialize based on mode
+    if (init.from === 'new') {
+        // New mode: create fresh state with provided initial values
+        const objects = init.objects ?? ({} as InitialObjectValuesParam<T>);
+        serverSnapshot = createEmptySnapshot(objects);
+        state = createEmptyState(objects);
+    } else {
+        // Restore mode: deserialize persisted state
+        const persisted = JSON.parse(init.data) as PersistedState<ServerSnapshot<T>>;
+        serverSnapshot = persisted.serverSnapshot;
+
+        // Restore pending mutations
+        pendingMutations.push(...(persisted.pendingMutations as PendingMutation<T>[]));
+
+        // Initialize state with unwrapped snapshot
+        // Pending mutations will be reapplied after rebaseState is defined
+        state = unwrapSnapshot(serverSnapshot);
+    }
 
     /**
      * Rebase state by applying all pending mutations to unwrapped server state
@@ -479,8 +539,7 @@ export function syncEngine<T extends FullSchemaDefinition>(
             (currentState, mutation) => {
                 const mutator = mutators[mutation.name];
                 if (!mutator) {
-                    console.warn(`No mutator registered for mutation: ${String(mutation.name)}`);
-                    return currentState;
+                    throw new Error(`No handler found for mutation '${String(mutation.name)}'. This should not happen if the schema was validated correctly.`);
                 }
                 return produce(currentState, draft => {
                     mutator(draft as SyncState<T>, mutation.input);
@@ -489,6 +548,11 @@ export function syncEngine<T extends FullSchemaDefinition>(
             baseState
         );
     };
+
+    // If restoring with pending mutations, rebase now
+    if (init.from === 'restore' && pendingMutations.length > 0) {
+        rebaseState();
+    }
 
     /**
      * Apply partial update to a state representation (server snapshot or client state)
@@ -768,10 +832,6 @@ export function syncEngine<T extends FullSchemaDefinition>(
             rebaseState();
         },
 
-        addMutator(name, handler) {
-            mutators[name] = handler as Mutator<T>;
-        },
-
         commit(mutationIds) {
             // Normalize to array
             const idsToCommit = Array.isArray(mutationIds) ? mutationIds : [mutationIds];
@@ -825,6 +885,15 @@ export function syncEngine<T extends FullSchemaDefinition>(
                     allowLocalFields
                 );
             }
+        },
+
+        persist() {
+            // Serialize server snapshot and pending mutations
+            const persisted: PersistedState<ServerSnapshot<T>> = {
+                serverSnapshot,
+                pendingMutations: pendingMutations as unknown[],
+            };
+            return JSON.stringify(persisted);
         },
     };
 }

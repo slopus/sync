@@ -29,9 +29,12 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'dark',
-                    fontSize: 14,
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'dark',
+                        fontSize: 14,
+                    },
                 },
             });
 
@@ -62,9 +65,12 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'light',
-                    fontSize: 12,
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'light',
+                        fontSize: 12,
+                    },
                 },
             });
 
@@ -106,8 +112,11 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'dark',
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'dark',
+                    },
                 },
             });
 
@@ -153,9 +162,12 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'light',
-                    fontSize: 12,
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'light',
+                        fontSize: 12,
+                    },
                 },
             });
 
@@ -200,8 +212,11 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'dark',
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'dark',
+                    },
                 },
             });
 
@@ -245,8 +260,11 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'dark',
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'dark',
+                    },
                 },
             });
 
@@ -277,8 +295,11 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'light',
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'light',
+                    },
                 },
             });
 
@@ -326,9 +347,12 @@ describe('Singleton Objects', () => {
             });
 
             const engine = syncEngine(schema, {
-                settings: {
-                    theme: 'dark',
-                    fontSize: 14,
+                from: 'new',
+                objects: {
+                    settings: {
+                        theme: 'dark',
+                        fontSize: 14,
+                    },
                 },
             });
 
