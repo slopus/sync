@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
 import {
     defineSchema,
     type,
@@ -37,8 +36,7 @@ describe('Type Safety in Mutations', () => {
             // Step 2: Add mutations with fully typed draft parameter
             const schema = types.withMutations({
                 createTodo: mutation(
-                    z.object({ id: z.string(), title: z.string(), priority: z.number() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string; priority: number }) => {
                         // draft should have full type safety here
                         // draft.todos, draft.users should autocomplete
                         draft.todos[input.id] = {
@@ -50,16 +48,14 @@ describe('Type Safety in Mutations', () => {
                     }
                 ),
                 updateTodo: mutation(
-                    z.object({ id: z.string(), completed: z.boolean() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; completed: boolean }) => {
                         if (draft.todos[input.id]) {
                             draft.todos[input.id].completed = input.completed;
                         }
                     }
                 ),
                 createUser: mutation(
-                    z.object({ id: z.string(), name: z.string(), email: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; name: string; email: string }) => {
                         draft.users[input.id] = {
                             id: input.id,
                             name: input.name,
@@ -118,8 +114,7 @@ describe('Type Safety in Mutations', () => {
 
             const schema = types.withMutations({
                 createItem: mutation(
-                    z.object({ id: z.string(), name: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; name: string }) => {
                         draft.items[input.id] = {
                             id: input.id,
                             name: input.name,
@@ -129,8 +124,7 @@ describe('Type Safety in Mutations', () => {
                     }
                 ),
                 toggleExpanded: mutation(
-                    z.object({ id: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string }) => {
                         if (draft.items[input.id]) {
                             draft.items[input.id].isExpanded = !draft.items[input.id].isExpanded;
                         }
@@ -171,13 +165,7 @@ describe('Type Safety in Mutations', () => {
 
             const schema = types.withMutations({
                 createPost: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        content: z.string(),
-                        authorId: z.string(),
-                    }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string; content: string; authorId: string }) => {
                         draft.posts[input.id] = {
                             id: input.id,
                             title: input.title,
@@ -187,13 +175,7 @@ describe('Type Safety in Mutations', () => {
                     }
                 ),
                 addComment: mutation(
-                    z.object({
-                        id: z.string(),
-                        postId: z.string(),
-                        text: z.string(),
-                        authorId: z.string(),
-                    }),
-                    (draft, input) => {
+                    (draft, input: { id: string; postId: string; text: string; authorId: string }) => {
                         draft.comments[input.id] = {
                             id: input.id,
                             postId: input.postId,

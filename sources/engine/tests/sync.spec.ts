@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect, expectTypeOf } from 'vitest';
-import { z } from 'zod';
 import {
     defineSchema,
     type,
@@ -24,14 +23,7 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {}
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {}),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -50,10 +42,7 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({ id: z.string(), title: z.string() }),
-                    (draft, input) => {}
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string }) => {}),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -78,18 +67,12 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -121,18 +104,12 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -164,18 +141,12 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -200,38 +171,21 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                            completed: false,
-                        };
+                createTodo: mutation((draft, input: { id: string; title: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        completed: false,
+                    };
+                }),
+                updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = input.completed;
                     }
-                ),
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = input.completed;
-                        }
-                    }
-                ),
-                deleteTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                    }),
-                    (draft, input) => {
-                        delete draft.todos[input.id];
-                    }
-                ),
+                }),
+                deleteTodo: mutation((draft, input: { id: string }) => {
+                    delete draft.todos[input.id];
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -271,20 +225,13 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        priority: z.number(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                            priority: input.priority,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string; priority: number }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        priority: input.priority,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -313,21 +260,13 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        const data = input as { id: string; title: string; completed: boolean };
-                        draft.todos[data.id] = {
-                            id: data.id,
-                            title: data.title,
-                            completed: data.completed,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        completed: input.completed,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -345,21 +284,13 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        const data = input as { id: string; title: string; completed: boolean };
-                        draft.todos[data.id] = {
-                            id: data.id,
-                            title: data.title,
-                            completed: data.completed,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        completed: input.completed,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -384,31 +315,18 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                            completed: input.completed,
-                        };
+                createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        completed: input.completed,
+                    };
+                }),
+                updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = input.completed;
                     }
-                ),
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = input.completed;
-                        }
-                    }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -561,17 +479,11 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = input.completed;
-                        }
+                updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = input.completed;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -609,17 +521,11 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = input.completed;
-                        }
+                updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = input.completed;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -664,31 +570,18 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                            completed: input.completed,
-                        };
+                createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        completed: input.completed,
+                    };
+                }),
+                updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = input.completed;
                     }
-                ),
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = input.completed;
-                        }
-                    }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -741,18 +634,12 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -775,17 +662,11 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].title = input.title;
-                        }
+                updateTodo: mutation((draft, input: { id: string; title: string }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].title = input.title;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -825,20 +706,13 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                            completed: input.completed,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string; completed: boolean }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        completed: input.completed,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -878,18 +752,12 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -923,20 +791,13 @@ describe('Sync Engine', () => {
                     },
                 }),
             }).withMutations({
-                createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        assignedTo: z.string(),
-                    }),
-                    (draft, input) => {
-                        draft.todos[input.id] = {
-                            id: input.id,
-                            title: input.title,
-                            assignedTo: input.assignedTo,
-                        };
-                    }
-                ),
+                createTodo: mutation((draft, input: { id: string; title: string; assignedTo: string }) => {
+                    draft.todos[input.id] = {
+                        id: input.id,
+                        title: input.title,
+                        assignedTo: input.assignedTo,
+                    };
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });

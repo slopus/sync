@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { z } from 'zod';
 import {
     defineSchema,
     type,
@@ -337,17 +336,11 @@ describe('Dual-Representation Architecture', () => {
                     versioned: true,
                 }),
             }).withMutations({
-                updateTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = input.completed;
-                        }
+                updateTodo: mutation((draft, input: { id: string; completed: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = input.completed;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });

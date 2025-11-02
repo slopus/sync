@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect, expectTypeOf } from 'vitest';
-import { z } from 'zod';
 import {
     defineSchema,
     type,
@@ -171,17 +170,11 @@ describe('Local Fields', () => {
                     },
                 }),
             }).withMutations({
-                toggleExpanded: mutation(
-                    z.object({
-                        id: z.string(),
-                        isExpanded: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].isExpanded = input.isExpanded;
-                        }
+                toggleExpanded: mutation((draft, input: { id: string; isExpanded: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].isExpanded = input.isExpanded;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -225,17 +218,11 @@ describe('Local Fields', () => {
                     },
                 }),
             }).withMutations({
-                toggleSelection: mutation(
-                    z.object({
-                        id: z.string(),
-                        isSelected: z.boolean(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].isSelected = input.isSelected;
-                        }
+                toggleSelection: mutation((draft, input: { id: string; isSelected: boolean }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].isSelected = input.isSelected;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -271,27 +258,16 @@ describe('Local Fields', () => {
                     },
                 }),
             }).withMutations({
-                expand: mutation(
-                    z.object({
-                        id: z.string(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].isExpanded = true;
-                        }
+                expand: mutation((draft, input: { id: string }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].isExpanded = true;
                     }
-                ),
-                updatePriority: mutation(
-                    z.object({
-                        id: z.string(),
-                        priority: z.number(),
-                    }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].priority = input.priority;
-                        }
+                }),
+                updatePriority: mutation((draft, input: { id: string; priority: number }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].priority = input.priority;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });
@@ -499,14 +475,11 @@ describe('Local Fields', () => {
                     },
                 }),
             }).withMutations({
-                toggleCompleted: mutation(
-                    z.object({ id: z.string() }),
-                    (draft, input) => {
-                        if (draft.todos[input.id]) {
-                            draft.todos[input.id].completed = !draft.todos[input.id].completed;
-                        }
+                toggleCompleted: mutation((draft, input: { id: string }) => {
+                    if (draft.todos[input.id]) {
+                        draft.todos[input.id].completed = !draft.todos[input.id].completed;
                     }
-                ),
+                }),
             });
 
             const engine = syncEngine(schema, { from: 'new' });

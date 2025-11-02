@@ -15,10 +15,8 @@ A TypeScript-first sync engine with local fields, versioned rebases, and Immer-b
 ## Installation
 
 ```bash
-yarn add @slopus/sync zod
+yarn add @slopus/sync
 ```
-
-Note: `zod` is a peer dependency used for mutation validation.
 
 ## Quick Start
 
@@ -28,7 +26,6 @@ Define your schema with full TypeScript autocomplete and type checking using the
 
 ```typescript
 import { defineSchema, type, field, localField, reference, mutation, syncEngine } from '@slopus/sync';
-import { z } from 'zod';
 import { createId } from '@paralleldrive/cuid2';
 
 // Define schema with types, then chain mutations for full type safety
@@ -48,42 +45,30 @@ const schema = defineSchema({
         },
     }),
 }).withMutations({
-    createTodo: mutation(
-        z.object({
-            title: z.string(),
-            assignedTo: z.string().nullable(),
-        }),
-        (draft, input) => {
-            // ✨ draft.todos has full autocomplete here!
-            const id = createId();
-            draft.todos[id] = {
-                id,
-                title: input.title,
-                completed: false,
-                assignedTo: input.assignedTo,
-                isExpanded: false,
-            };
+    createTodo: mutation((draft, input: { title: string; assignedTo: string | null }) => {
+        // ✨ draft.todos has full autocomplete here!
+        const id = createId();
+        draft.todos[id] = {
+            id,
+            title: input.title,
+            completed: false,
+            assignedTo: input.assignedTo,
+            isExpanded: false,
+        };
+    }),
+    toggleTodo: mutation((draft, input: { id: string }) => {
+        // ✨ TypeScript will catch typos like draft.todoss[input.id]
+        if (draft.todos[input.id]) {
+            draft.todos[input.id].completed = !draft.todos[input.id].completed;
         }
-    ),
-    toggleTodo: mutation(
-        z.object({ id: z.string() }),
-        (draft, input) => {
-            // ✨ TypeScript will catch typos like draft.todoss[input.id]
-            if (draft.todos[input.id]) {
-                draft.todos[input.id].completed = !draft.todos[input.id].completed;
-            }
-        }
-    ),
+    }),
 });
 
 // You can also chain multiple .withMutations() calls:
 const extendedSchema = schema.withMutations({
-    deleteTodo: mutation(
-        z.object({ id: z.string() }),
-        (draft, input) => {
-            delete draft.todos[input.id];
-        }
-    ),
+    deleteTodo: mutation((draft, input: { id: string }) => {
+        delete draft.todos[input.id];
+    }),
 });
 ```
 
@@ -140,23 +125,26 @@ Use the schema DSL to define collections and singletons:
 
 ```typescript
 const schema = defineSchema({
-    types: {
-        // Collection (multiple items with IDs)
-        posts: type({
-            fields: {
-                title: field<string>(),
-                content: field<string>(),
-            },
-        }),
+    // Collection (multiple items with IDs)
+    posts: type({
+        fields: {
+            title: field<string>(),
+            content: field<string>(),
+        },
+    }),
 
-        // Singleton object (single instance, no ID)
-        settings: object({
-            fields: {
-                theme: field<'light' | 'dark'>(),
-                notifications: field<boolean>(),
-            },
-        }),
-    }
+    // Singleton object (single instance, no ID)
+    settings: object({
+        fields: {
+            theme: field<'light' | 'dark'>(),
+            notifications: field<boolean>(),
+        },
+    }),
+}).withMutations({
+    // Define mutations with handler functions
+    updateTheme: mutation((draft, input: { theme: 'light' | 'dark' }) => {
+        draft.settings.theme = input.theme;
+    }),
 });
 
 // Singleton objects require initial values
@@ -190,25 +178,19 @@ Local fields are perfect for UI state that should never leave the client:
 
 ```typescript
 const schema = defineSchema({
-    types: {
-        items: type({
-            fields: {
-                name: field<string>(),
-                isExpanded: localField(false), // ← never synced
-                isSelected: localField(false),
-            },
-        }),
-    },
-    mutations: {
-        toggleExpanded: mutation(
-            z.object({ id: z.string() }),
-            (draft, input) => {
-                if (draft.items[input.id]) {
-                    draft.items[input.id].isExpanded = !draft.items[input.id].isExpanded;
-                }
-            }
-        ),
-    },
+    items: type({
+        fields: {
+            name: field<string>(),
+            isExpanded: localField(false), // ← never synced
+            isSelected: localField(false),
+        },
+    }),
+}).withMutations({
+    toggleExpanded: mutation((draft, input: { id: string }) => {
+        if (draft.items[input.id]) {
+            draft.items[input.id].isExpanded = !draft.items[input.id].isExpanded;
+        }
+    }),
 });
 
 const engine = syncEngine(schema, { from: 'new' }); // Collections only, objects optional
@@ -246,24 +228,18 @@ Enable automatic Last-Write-Wins conflict resolution:
 
 ```typescript
 const schema = defineSchema({
-    types: {
-        docs: type({
-            fields: {
-                content: field<string>(),
-            },
-            versioned: true, // ← enables $version tracking
-        }),
-    },
-    mutations: {
-        updateContent: mutation(
-            z.object({ id: z.string(), content: z.string() }),
-            (draft, input) => {
-                if (draft.docs[input.id]) {
-                    draft.docs[input.id].content = input.content;
-                }
-            }
-        ),
-    },
+    docs: type({
+        fields: {
+            content: field<string>(),
+        },
+        versioned: true, // ← enables $version tracking
+    }),
+}).withMutations({
+    updateContent: mutation((draft, input: { id: string; content: string }) => {
+        if (draft.docs[input.id]) {
+            draft.docs[input.id].content = input.content;
+        }
+    }),
 });
 
 const engine = syncEngine(schema, { from: 'new' }); // Collections only
@@ -315,7 +291,7 @@ type ToggleTodoInput = InferMutationInput<typeof schema, 'toggleTodo'>;
 - `field<T>()` - Define a synced field
 - `localField<T>(defaultValue)` - Define a local-only field
 - `reference(collection, nullable)` - Define a reference field
-- `mutation(schema, handler)` - Define a mutation with Zod schema and handler function
+- `mutation(handler)` - Define a mutation with a handler function (input type inferred from parameter)
 - `.withMutations(mutations)` - Add mutations to a schema (chainable, throws error on duplicate names)
 
 ### Sync Engine

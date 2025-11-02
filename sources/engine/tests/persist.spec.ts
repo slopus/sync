@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
 import {
     defineSchema,
     type,
@@ -26,12 +25,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string; completed: boolean }) => {
                         draft.todos[input.id] = {
                             id: input.id,
                             title: input.title,
@@ -66,12 +60,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string; completed: boolean }) => {
                         draft.todos[input.id] = {
                             id: input.id,
                             title: input.title,
@@ -130,12 +119,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 createTodo: mutation(
-                    z.object({
-                        id: z.string(),
-                        title: z.string(),
-                        completed: z.boolean(),
-                    }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string; completed: boolean }) => {
                         draft.todos[input.id] = {
                             id: input.id,
                             title: input.title,
@@ -207,8 +191,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 updateTheme: mutation(
-                    z.object({ theme: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { theme: string }) => {
                         draft.settings.theme = input.theme;
                     }
                 ),
@@ -252,8 +235,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 createTodo: mutation(
-                    z.object({ id: z.string(), title: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string }) => {
                         draft.todos[input.id] = {
                             id: input.id,
                             title: input.title,
@@ -290,8 +272,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 setLocalNote: mutation(
-                    z.object({ id: z.string(), note: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; note: string }) => {
                         draft.todos[input.id].localNote = input.note;
                     }
                 ),
@@ -325,8 +306,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 createTodo: mutation(
-                    z.object({ id: z.string(), title: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string }) => {
                         draft.todos[input.id] = {
                             id: input.id,
                             title: input.title,
@@ -365,8 +345,7 @@ describe('Persistence', () => {
                 }),
             }).withMutations({
                 createUser: mutation(
-                    z.object({ id: z.string(), name: z.string(), email: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; name: string; email: string }) => {
                         draft.users[input.id] = {
                             id: input.id,
                             name: input.name,
@@ -375,8 +354,7 @@ describe('Persistence', () => {
                     }
                 ),
                 createTodo: mutation(
-                    z.object({ id: z.string(), title: z.string(), userId: z.string() }),
-                    (draft, input) => {
+                    (draft, input: { id: string; title: string; userId: string }) => {
                         draft.todos[input.id] = {
                             id: input.id,
                             title: input.title,

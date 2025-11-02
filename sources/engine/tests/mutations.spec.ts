@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect, expectTypeOf } from 'vitest';
-import { z } from 'zod';
 import {
     defineSchema,
     type,
@@ -24,27 +23,9 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({
-                    title: z.string(),
-                    completed: z.boolean().default(false),
-                }),
-                (draft, input) => {}
-            ),
-            updateTodo: mutation(
-                z.object({
-                    id: z.string(),
-                    title: z.string().optional(),
-                    completed: z.boolean().optional(),
-                }),
-                (draft, input) => {}
-            ),
-            deleteTodo: mutation(
-                z.object({
-                    id: z.string(),
-                }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string; completed?: boolean }) => {}),
+            updateTodo: mutation((draft, input: { id: string; title?: string; completed?: boolean }) => {}),
+            deleteTodo: mutation((draft, input: { id: string }) => {}),
         });
 
         expect(schema._schema.types.todos).toBeDefined();
@@ -59,20 +40,13 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string }) => {}),
         });
 
         const mutationDescriptor = schema.mutation('createTodo');
         expect(mutationDescriptor).toBeDefined();
-        expect(mutationDescriptor.schema).toBeDefined();
         expect(mutationDescriptor.handler).toBeDefined();
-
-        // Validate that it's a proper Zod schema
-        const result = mutationDescriptor.schema.parse({ title: 'Test' });
-        expect(result).toEqual({ title: 'Test' });
+        expect(typeof mutationDescriptor.handler).toBe('function');
     });
 
     it('should list all mutation names', () => {
@@ -83,18 +57,9 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
-            updateTodo: mutation(
-                z.object({ id: z.string() }),
-                (draft, input) => {}
-            ),
-            deleteTodo: mutation(
-                z.object({ id: z.string() }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string }) => {}),
+            updateTodo: mutation((draft, input: { id: string }) => {}),
+            deleteTodo: mutation((draft, input: { id: string }) => {}),
         });
 
         const mutationNames = schema.mutations();
@@ -112,16 +77,12 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string }) => {}),
         });
 
         // Should be able to access existing mutation
         const mutationDescriptor = schema.mutation('createTodo');
         expect(mutationDescriptor).toBeDefined();
-        expect(mutationDescriptor.schema).toBeDefined();
     });
 
     it('should work with schemas without mutations', () => {
@@ -148,11 +109,7 @@ describe('Schema Mutations', () => {
             }),
         }).withMutations({
             createTodo: mutation(
-                z.object({
-                    title: z.string(),
-                    completed: z.boolean(),
-                }),
-                (draft, input) => {}
+                (draft, input: { title: string; completed: boolean }) => {}
             ),
         });
 
@@ -173,11 +130,7 @@ describe('Schema Mutations', () => {
             }),
         }).withMutations({
             createTodo: mutation(
-                z.object({
-                    title: z.string(),
-                    completed: z.boolean().default(false),
-                }),
-                (draft, input) => {}
+                (draft, input: { title: string; completed?: boolean }) => {}
             ),
         });
 
@@ -197,18 +150,9 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
-            updateTodo: mutation(
-                z.object({ id: z.string() }),
-                (draft, input) => {}
-            ),
-            deleteTodo: mutation(
-                z.object({ id: z.string() }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string }) => {}),
+            updateTodo: mutation((draft, input: { id: string }) => {}),
+            deleteTodo: mutation((draft, input: { id: string }) => {}),
         });
 
         type Mutations = InferMutations<typeof schema>;
@@ -225,29 +169,12 @@ describe('Schema Mutations', () => {
             }),
         }).withMutations({
             createTodoWithMetadata: mutation(
-                z.object({
-                    title: z.string(),
-                    metadata: z.object({
-                        tags: z.array(z.string()),
-                        priority: z.number(),
-                    }),
-                }),
-                (draft, input) => {}
+                (draft, input: { title: string; metadata: { tags: string[]; priority: number } }) => {}
             ),
         });
 
         const mutationDescriptor = schema.mutation('createTodoWithMetadata');
-        const result = mutationDescriptor.schema.parse({
-            title: 'Test',
-            metadata: {
-                tags: ['work', 'urgent'],
-                priority: 1,
-            },
-        });
-
-        expect(result.title).toBe('Test');
-        expect(result.metadata.tags).toEqual(['work', 'urgent']);
-        expect(result.metadata.priority).toBe(1);
+        expect(mutationDescriptor).toBeDefined();
 
         type Input = InferMutationInput<typeof schema, 'createTodoWithMetadata'>;
         expectTypeOf<Input>().toEqualTypeOf<{
@@ -268,10 +195,7 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            create: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
+            create: mutation((draft, input: { title: string }) => {}),
         });
 
         // Schema without mutations
@@ -298,15 +222,9 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string }) => {}),
         }).withMutations({
-            updateTodo: mutation(
-                z.object({ id: z.string() }),
-                (draft, input) => {}
-            ),
+            updateTodo: mutation((draft, input: { id: string }) => {}),
         });
 
         const mutationNames = schema.mutations();
@@ -323,18 +241,12 @@ describe('Schema Mutations', () => {
                 },
             }),
         }).withMutations({
-            createTodo: mutation(
-                z.object({ title: z.string() }),
-                (draft, input) => {}
-            ),
+            createTodo: mutation((draft, input: { title: string }) => {}),
         });
 
         expect(() => {
             schema.withMutations({
-                createTodo: mutation(
-                    z.object({ title: z.string() }),
-                    (draft, input) => {}
-                ),
+                createTodo: mutation((draft, input: { title: string }) => {}),
             });
         }).toThrow("Mutation 'createTodo' already exists");
     });

@@ -7,7 +7,6 @@
  * - Automatic type inference for Create, Update, Item, and Denormalized representations
  */
 
-import type { z } from 'zod';
 import type { FieldValue, Version } from './types';
 
 // ============================================================================
@@ -321,10 +320,10 @@ export type SchemaDefinition = {
  *
  * The handler receives:
  * - draft: Mutable draft of the current state (via Immer)
- * - input: The validated input data for this mutation
+ * - input: The input data for this mutation
  *
- * @typeParam TState - The state type (inferred from schema when using defineTypes())
- * @typeParam TInput - The input type (inferred from Zod schema)
+ * @typeParam TState - The state type (inferred from schema when using defineSchema())
+ * @typeParam TInput - The input type (inferred from handler parameter)
  */
 export type MutationHandler<TState, TInput> = (
     draft: TState,
@@ -332,66 +331,44 @@ export type MutationHandler<TState, TInput> = (
 ) => void;
 
 /**
- * Single mutation descriptor containing both schema and handler
+ * Single mutation descriptor containing the handler function
  */
 export interface MutationDescriptor<TState, TInput> {
-    /** Zod schema for validating mutation input */
-    schema: z.ZodType<TInput>;
     /** Handler function that applies the mutation to state */
     handler: MutationHandler<TState, TInput>;
 }
 
 /**
  * Mutation definition
- * Maps mutation names to their descriptors (schema + handler)
+ * Maps mutation names to their descriptors (handlers)
  */
 export type MutationDefinition<TState = any> = {
     [mutationName: string]: MutationDescriptor<TState, any>;
 };
 
 /**
- * Create a mutation descriptor with schema and handler
+ * Create a mutation descriptor with a handler function
  *
- * For full type safety, use with `defineTypes().withMutations()` instead of `defineSchema()`.
+ * The input type is automatically inferred from the handler's parameter.
+ * For full type safety, use with `defineSchema().withMutations()`.
  *
- * @param schema - Zod schema for validating mutation input
  * @param handler - Handler function that applies the mutation to state
  * @returns Mutation descriptor
  *
  * @example
  * // With type safety (recommended):
- * const types = defineTypes({
- *   todos: type({ fields: { title: field<string>() } })
- * });
- *
- * const schema = types.withMutations({
- *   createTodo: mutation(
- *     z.object({ id: z.string(), title: z.string() }),
- *     (draft, input) => {
- *       draft.todos[input.id] = { id: input.id, title: input.title }; // ✓ Fully typed!
- *     }
- *   )
- * });
- *
- * @example
- * // Without type safety (simple):
  * const schema = defineSchema({
- *   types: { todos: type({ fields: { title: field<string>() } }) },
- *   mutations: {
- *     createTodo: mutation(
- *       z.object({ id: z.string(), title: z.string() }),
- *       (draft, input) => {
- *         draft.todos[input.id] = { id: input.id, title: input.title }; // draft: any
- *       }
- *     )
- *   }
+ *   todos: type({ fields: { title: field<string>() } })
+ * }).withMutations({
+ *   createTodo: mutation((draft, input: { id: string; title: string }) => {
+ *     draft.todos[input.id] = { id: input.id, title: input.title }; // ✓ Fully typed!
+ *   })
  * });
  */
 export function mutation<TState, TInput>(
-    schema: z.ZodType<TInput>,
     handler: MutationHandler<TState, TInput>
 ): MutationDescriptor<TState, TInput> {
-    return { schema, handler };
+    return { handler };
 }
 
 /**
