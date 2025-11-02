@@ -46,6 +46,8 @@ export type {
     InferMutationInput,
     InferMutationOutput,
     InferMutations,
+    ExtractObjectTypes,
+    InferInitialObjectValues,
 } from './schema';
 
 // Sync Engine

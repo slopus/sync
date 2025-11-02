@@ -62,7 +62,8 @@ const schema = defineSchema({
 ```typescript
 import { syncEngine } from '@slopus/sync';
 
-const engine = syncEngine(schema);
+// For schemas with only collections, pass empty object
+const engine = syncEngine(schema, {});
 
 // Register mutation handlers
 engine.addMutator('createTodo', (draft, input) => {
@@ -145,6 +146,21 @@ const schema = defineSchema({
         }),
     },
 });
+
+// Singleton objects require initial values
+const engine = syncEngine(schema, {
+    settings: {
+        theme: 'light',
+        notifications: true,
+    }
+    // Collections (like 'posts') are not included - they start empty
+});
+
+// Access singleton directly (no ID indexing)
+console.log(engine.state.settings.theme); // 'light'
+
+// Access collection with ID
+console.log(engine.state.posts['post-1']); // undefined (empty)
 ```
 
 ### Field Types
@@ -170,6 +186,8 @@ const schema = defineSchema({
     },
     mutations: {},
 });
+
+const engine = syncEngine(schema, {}); // Collections only, no initial values needed
 
 // Server updates ignore local fields
 engine.rebase({
@@ -214,6 +232,8 @@ const schema = defineSchema({
     },
     mutations: {},
 });
+
+const engine = syncEngine(schema, {}); // Collections only
 
 // Server sends updates with $version
 engine.rebase({
@@ -261,7 +281,10 @@ type ToggleTodoInput = InferMutationInput<typeof schema, 'toggleTodo'>;
 
 ### Sync Engine
 
-- `syncEngine(schema)` - Create a new sync engine instance
+- `syncEngine(schema, initialValues)` - Create a new sync engine instance
+  - `initialValues`: Required initial values for singleton objects (object() types)
+  - Pass `{}` if schema has only collections, no singletons
+  - Local fields are initialized automatically with their defaults
 - `engine.rebase(update, options?)` - Apply server updates
 - `engine.mutate(name, input)` - Apply optimistic mutation
 - `engine.addMutator(name, handler)` - Register mutation handler

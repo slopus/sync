@@ -841,6 +841,76 @@ export type InferMutationOutput<TSchema, TMutation extends keyof NonNullable<Ext
 export type InferMutations<TSchema> = keyof NonNullable<ExtractMutationDefinition<TSchema>>;
 
 // ============================================================================
+// Initial Values Type Inference
+// ============================================================================
+
+/**
+ * Extract only object (singleton) types from schema definition
+ * Filters out collection types, returns only ObjectType entries
+ *
+ * @example
+ * type Schema = {
+ *   settings: ObjectType<...>;
+ *   todos: CollectionType<...>;
+ * };
+ * type Objects = ExtractObjectTypes<Schema>;
+ * // { settings: ObjectType<...> }
+ */
+export type ExtractObjectTypes<T extends SchemaDefinition> = {
+    [K in keyof T as T[K] extends ObjectType ? K : never]: T[K];
+};
+
+/**
+ * Infer the required initial values for all singleton objects in schema
+ * Returns an object with plain values (not FieldValue wrapped)
+ * Only includes objects (ObjectType), excludes collections (CollectionType)
+ * Excludes local fields (they use default values)
+ *
+ * @example
+ * const schema = defineSchema({
+ *   types: {
+ *     settings: object({ fields: { theme: field<string>() } }),
+ *     todos: type({ fields: { title: field<string>() } })
+ *   }
+ * });
+ *
+ * type InitialValues = InferInitialObjectValues<typeof schema._schema>;
+ * // { settings: { theme: string } }
+ * // Note: 'todos' is excluded because it's a collection
+ */
+export type InferInitialObjectValues<T extends FullSchemaDefinition> = {
+    [K in keyof ExtractObjectTypes<T['types']>]: {
+        [F in keyof ExtractFields<T['types'][K]> as ExtractFields<T['types'][K]>[F]['fieldType'] extends 'local' ? never : F]:
+            InferFieldValue<ExtractFields<T['types'][K]>[F]>
+    }
+};
+
+/**
+ * Helper to check if schema has any object types
+ */
+type HasObjectTypes<T extends FullSchemaDefinition> =
+    keyof ExtractObjectTypes<T['types']> extends never ? false : true;
+
+/**
+ * Conditional type for initial values parameter
+ * - If schema has objects: required parameter with proper structure
+ * - If schema has no objects: empty object
+ *
+ * @example
+ * // Schema with objects
+ * type ParamWithObjects = InitialObjectValuesParam<SchemaWithObjects>;
+ * // { settings: { theme: string; fontSize: number } }
+ *
+ * // Schema without objects
+ * type ParamNoObjects = InitialObjectValuesParam<SchemaWithoutObjects>;
+ * // {}
+ */
+export type InitialObjectValuesParam<T extends FullSchemaDefinition> =
+    HasObjectTypes<T> extends true
+        ? InferInitialObjectValues<T>
+        : Record<string, never>;
+
+// ============================================================================
 // Schema Definition Function
 // ============================================================================
 

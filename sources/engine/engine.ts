@@ -1,4 +1,4 @@
-import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ObjectType, ExtractSchemaDefinition, InferObjectState, InferServerObjectState, CollectionSchema, InferFieldValue, ServerFieldsOnly, LocalFieldsOnly, ServerAndLocalFields, ExtractFields } from "./schema";
+import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ObjectType, ExtractSchemaDefinition, InferObjectState, InferServerObjectState, CollectionSchema, InferFieldValue, ServerFieldsOnly, LocalFieldsOnly, ServerAndLocalFields, ExtractFields, InitialObjectValuesParam } from "./schema";
 import { produce } from 'immer';
 import { createId } from '@paralleldrive/cuid2';
 import { FieldValue } from "./types";
@@ -322,18 +322,32 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
 /**
  * Create a sync engine for the given schema
  */
-export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEngine<T> {
+export function syncEngine<T extends FullSchemaDefinition>(
+    schema: Schema<T>,
+    initialValues: InitialObjectValuesParam<T>
+): SyncEngine<T> {
 
-    // Create empty initial state (client representation)
-    const createEmptyState = (): SyncState<T> => {
+    // Create initial state (client representation) with provided object values
+    const createEmptyState = (initialValues: InitialObjectValuesParam<T>): SyncState<T> => {
         const emptyState = {} as SyncState<T>;
         for (let name of Object.keys(schema._schema.types)) {
             const typeKey = name as keyof T['types'];
             const typeDef = (schema._schema.types as Record<string, CollectionType | ObjectType>)[name];
 
             if (typeDef._tag === 'ObjectType') {
-                // Singleton: initialize as empty object (will be populated on first rebase)
-                emptyState[typeKey] = {} as InferStateForType<T, typeof typeKey>;
+                // Singleton: initialize with provided values (plain)
+                const objectData = (initialValues as Record<string, Record<string, unknown>>)[name];
+                const plainObject: Record<string, unknown> = { ...objectData };
+
+                // Add local fields with defaults
+                for (const fieldName in typeDef.fields) {
+                    const field = typeDef.fields[fieldName];
+                    if (field.fieldType === 'local') {
+                        plainObject[fieldName] = field.defaultValue;
+                    }
+                }
+
+                emptyState[typeKey] = plainObject as InferStateForType<T, typeof typeKey>;
             } else {
                 // Collection: initialize as empty Record
                 emptyState[typeKey] = {} as InferStateForType<T, typeof typeKey>;
@@ -342,16 +356,47 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
         return emptyState;
     };
 
-    // Create empty initial server snapshot (server representation)
-    const createEmptySnapshot = (): ServerSnapshot<T> => {
+    // Create initial server snapshot (server representation) with provided object values
+    const createEmptySnapshot = (initialValues: InitialObjectValuesParam<T>): ServerSnapshot<T> => {
         const emptySnapshot = {} as ServerSnapshot<T>;
         for (let name of Object.keys(schema._schema.types)) {
             const typeKey = name as keyof T['types'];
             const typeDef = (schema._schema.types as Record<string, CollectionType | ObjectType>)[name];
 
             if (typeDef._tag === 'ObjectType') {
-                // Singleton: initialize as empty object
-                (emptySnapshot as Record<string, unknown>)[name] = {} as InferServerStateForType<T, typeof typeKey>;
+                // Singleton: initialize with provided values wrapped as FieldValue
+                const objectData = (initialValues as Record<string, Record<string, unknown>>)[name];
+                const wrappedObject: Record<string, unknown> = {};
+
+                // Wrap each field with version: 0
+                for (const fieldName in typeDef.fields) {
+                    const field = typeDef.fields[fieldName];
+
+                    if (field.fieldType === 'local') {
+                        // Local fields use default value
+                        wrappedObject[fieldName] = {
+                            value: field.defaultValue,
+                            version: 0,
+                        };
+                    } else {
+                        // Server fields use provided value
+                        if (fieldName in objectData) {
+                            wrappedObject[fieldName] = {
+                                value: objectData[fieldName],
+                                version: 0,
+                            };
+                        } else {
+                            throw new Error(`Missing initial value for field '${fieldName}' in object '${name}'`);
+                        }
+                    }
+                }
+
+                // Add version if tracking enabled
+                if (typeDef.versioned) {
+                    wrappedObject.$version = 0;
+                }
+
+                emptySnapshot[typeKey] = wrappedObject as InferServerStateForType<T, typeof typeKey>;
             } else {
                 // Collection: initialize as empty Record
                 (emptySnapshot as Record<string, Record<string, unknown>>)[name] = {};
@@ -361,8 +406,8 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
     };
 
     // Internal state
-    let serverSnapshot: ServerSnapshot<T> = createEmptySnapshot();
-    let state: SyncState<T> = createEmptyState();
+    let serverSnapshot: ServerSnapshot<T> = createEmptySnapshot(initialValues);
+    let state: SyncState<T> = createEmptyState(initialValues);
     // Pending mutations waiting for server confirmation
     const pendingMutations: PendingMutation<T>[] = [];
     const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;

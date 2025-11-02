@@ -33,7 +33,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             expect(engine.state).toBeDefined();
             expect(engine.serverState).toBeDefined();
@@ -55,7 +55,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             type ExpectedState = {
                 todos: Record<string, {
@@ -86,7 +86,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -131,7 +131,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -176,7 +176,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -221,7 +221,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -286,7 +286,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -330,7 +330,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 const data = input as { id: string; title: string; completed: boolean };
@@ -364,7 +364,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 const data = input as { id: string; title: string; completed: boolean };
@@ -409,7 +409,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -454,7 +454,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Create initial item with full data
             engine.rebase({
@@ -494,7 +494,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Try to create new item with missing fields
             engine.rebase({
@@ -522,7 +522,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Create new item with all fields
             engine.rebase({
@@ -551,7 +551,7 @@ describe('Sync Engine', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Create item with null description
             engine.rebase({
@@ -593,7 +593,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('updateTodo', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -643,7 +643,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('updateTodo', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -705,7 +705,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -778,7 +778,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -814,7 +814,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('updateTodo', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -867,7 +867,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -921,7 +921,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {
@@ -969,7 +969,7 @@ describe('Sync Engine', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('createTodo', (draft, input) => {
                 draft.todos[input.id] = {

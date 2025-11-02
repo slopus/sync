@@ -28,7 +28,12 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'dark',
+                    fontSize: 14,
+                },
+            });
 
             // Rebase with singleton data (no id, single object)
             engine.rebase({
@@ -56,7 +61,12 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'light',
+                    fontSize: 12,
+                },
+            });
 
             // Initial rebase
             engine.rebase({
@@ -95,7 +105,11 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'dark',
+                },
+            });
 
             engine.rebase({
                 settings: {
@@ -138,7 +152,12 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'light',
+                    fontSize: 12,
+                },
+            });
 
             // First update with version 1
             vi.setSystemTime(1000);
@@ -180,7 +199,11 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'dark',
+                },
+            });
 
             // Update with version 3 (arrives first but is newer)
             vi.setSystemTime(3000);
@@ -221,7 +244,11 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'dark',
+                },
+            });
 
             engine.rebase({
                 settings: {
@@ -249,7 +276,11 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'light',
+                },
+            });
 
             // Create singleton with default local field
             vi.setSystemTime(1000);
@@ -294,7 +325,12 @@ describe('Singleton Objects', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'dark',
+                    fontSize: 14,
+                },
+            });
 
             engine.rebase({
                 settings: {

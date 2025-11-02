@@ -162,7 +162,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Server doesn't include local fields
             engine.rebase({
@@ -197,7 +197,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('toggleExpanded', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -253,7 +253,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('toggleSelection', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -304,7 +304,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('expand', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -363,7 +363,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 items: [{
@@ -394,7 +394,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Create item with default local field
             engine.rebase({
@@ -431,7 +431,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{
@@ -468,7 +468,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{
@@ -504,7 +504,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{
@@ -542,7 +542,7 @@ describe('Local Fields', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('toggleCompleted', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -593,7 +593,11 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {
+                settings: {
+                    theme: 'light',
+                },
+            });
 
             // Create singleton
             engine.rebase({
@@ -628,7 +632,7 @@ describe('Local Fields', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{

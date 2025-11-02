@@ -30,7 +30,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // First update
             engine.rebase({
@@ -70,7 +70,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{
@@ -109,7 +109,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // First update with version 1
             vi.setSystemTime(1000);
@@ -154,7 +154,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // First update with version 3 (arrives first but is newer)
             vi.setSystemTime(3000);
@@ -200,7 +200,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Initial state with version 1
             vi.setSystemTime(1000);
@@ -274,7 +274,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Create user with version 1
             vi.setSystemTime(1000);
@@ -329,7 +329,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{
@@ -366,7 +366,7 @@ describe('Dual-Representation Architecture', () => {
                 },
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.addMutator('updateTodo', (draft, input) => {
                 if (draft.todos[input.id]) {
@@ -414,7 +414,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             engine.rebase({
                 todos: [{
@@ -445,7 +445,7 @@ describe('Dual-Representation Architecture', () => {
                 mutations: {},
             });
 
-            const engine = syncEngine(schema);
+            const engine = syncEngine(schema, {});
 
             // Create todo with default local field at t=1000
             vi.setSystemTime(1000);
