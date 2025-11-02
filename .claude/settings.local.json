@@ -5,7 +5,11 @@
       "Bash(yarn test)",
       "Bash(yarn build:*)",
       "Bash(yarn start)",
-      "Bash(yarn test:*)"
+      "Bash(yarn test:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(for file in /Users/steve/Develop/slopus/sync/sources/engine/tests/{sync,mutations,local-fields}.spec.ts)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

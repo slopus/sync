@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
     defineSchema,
     type,
-    mutableField,
+    field,
     localField,
     sync,
     type InferCreate,
@@ -30,7 +30,7 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                             isSelected: localField(false),
                         },
@@ -51,8 +51,8 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                             isExpanded: localField(false),
                         },
                     }),
@@ -78,7 +78,7 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                         },
                     }),
@@ -98,12 +98,12 @@ describe('Local Fields', () => {
     });
 
     describe('Type Inference - Item', () => {
-        it('should wrap local fields with value and changedAt', () => {
+        it('should wrap local fields with value and version', () => {
             const schema = defineSchema({
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                         },
                     }),
@@ -117,8 +117,8 @@ describe('Local Fields', () => {
             expectTypeOf<Todo>().toMatchTypeOf<{
                 id: string;
                 createdAt: number;
-                title: { value: string; changedAt: number };
-                isExpanded: { value: boolean; changedAt: number };
+                title: { value: string; version: number };
+                isExpanded: { value: boolean; version: number };
             }>();
         });
     });
@@ -129,7 +129,7 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                         },
                     }),
@@ -154,7 +154,7 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                             isSelected: localField(false),
                         },
@@ -186,7 +186,7 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                         },
                     }),
@@ -242,7 +242,7 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             isExpanded: localField(false),
                             isSelected: localField(false),
                         },
@@ -291,8 +291,8 @@ describe('Local Fields', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            priority: mutableField<number>(),
+                            title: field<string>(),
+                            priority: field<number>(),
                             isExpanded: localField(false),
                         },
                     }),
@@ -357,7 +357,7 @@ describe('Local Fields', () => {
                 types: {
                     items: type({
                         fields: {
-                            name: mutableField<string>(),
+                            name: field<string>(),
                             expanded: localField(false),
                             selectedCount: localField(0),
                             tags: localField<string[]>([]),

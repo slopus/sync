@@ -2,12 +2,13 @@
  * Schema DSL for defining collection types
  *
  * Provides a declarative way to define schemas for collections with:
- * - Mutable fields (with changedAt tracking)
+ * - Mutable fields (with version tracking)
  * - Immutable fields (plain values)
  * - Automatic type inference for Create, Update, Item, and Denormalized representations
  */
 
 import type { z } from 'zod';
+import type { FieldValue, Version } from './types';
 
 // ============================================================================
 // Field Descriptors
@@ -16,24 +17,14 @@ import type { z } from 'zod';
 /**
  * Field type discriminator
  */
-export type FieldType = 'mutable' | 'immutable' | 'reference' | 'local';
+export type FieldType = 'field' | 'reference' | 'local';
 
 /**
- * Mutable field descriptor
- * Mutable fields track when they were last changed
+ * Regular field descriptor
+ * All fields track versions for conflict resolution when versioned is enabled
  */
-export interface MutableFieldDescriptor<T = unknown> {
-    readonly fieldType: 'mutable';
-    // Phantom type parameter for TypeScript type inference
-    readonly __type?: T;
-}
-
-/**
- * Immutable field descriptor
- * Immutable fields are set once and never change
- */
-export interface ImmutableFieldDescriptor<T = unknown> {
-    readonly fieldType: 'immutable';
+export interface RegularFieldDescriptor<T = unknown> {
+    readonly fieldType: 'field';
     // Phantom type parameter for TypeScript type inference
     readonly __type?: T;
 }
@@ -42,7 +33,7 @@ export interface ImmutableFieldDescriptor<T = unknown> {
  * Local field descriptor
  * Local fields are client-side only and track when they were last changed
  * - Always initialized with a default value
- * - Can be mutated locally (tracked with changedAt)
+ * - Can be mutated locally (tracked with version)
  * - NOT synced from server (server updates ignore local fields)
  * - Useful for UI state like selection, expansion, etc.
  */
@@ -71,40 +62,29 @@ export interface ReferenceFieldDescriptor<TCollection extends string = string, T
  * This ensures only valid field descriptors can be used in schemas
  */
 export type FieldDescriptor<T = unknown> =
-    | MutableFieldDescriptor<T>
-    | ImmutableFieldDescriptor<T>
+    | RegularFieldDescriptor<T>
     | LocalFieldDescriptor<T>
     | ReferenceFieldDescriptor<any, any>;
 
 /**
- * Create a mutable field descriptor
- * Mutable fields track when they were last changed
+ * Create a regular field descriptor
+ * All fields participate in version tracking when trackUpdatedAt is enabled
  *
  * @example
  * const schema = defineSchema({
- *   todos: {
- *     title: mutable<string>(),
- *     completed: mutable<boolean>(),
+ *   types: {
+ *     todos: type({
+ *       fields: {
+ *         title: field<string>(),
+ *         completed: field<boolean>(),
+ *         priority: field<number>(),
+ *       }
+ *     })
  *   }
  * });
  */
-export function mutable<T>(): MutableFieldDescriptor<T> {
-    return { fieldType: 'mutable' } as MutableFieldDescriptor<T>;
-}
-
-/**
- * Create an immutable field descriptor
- * Immutable fields are set once and never change
- *
- * @example
- * const schema = defineSchema({
- *   todos: {
- *     priority: immutable<number>(),
- *   }
- * });
- */
-export function immutable<T>(): ImmutableFieldDescriptor<T> {
-    return { fieldType: 'immutable' } as ImmutableFieldDescriptor<T>;
+export function field<T>(): RegularFieldDescriptor<T> {
+    return { fieldType: 'field' } as RegularFieldDescriptor<T>;
 }
 
 /**
@@ -113,7 +93,7 @@ export function immutable<T>(): ImmutableFieldDescriptor<T> {
  *
  * Local fields:
  * - Always have a default value
- * - Track changes locally (with changedAt timestamp)
+ * - Track changes locally (with version timestamp)
  * - Are NOT updated from server snapshots (always use default value)
  * - Perfect for UI state (selection, expansion, filters, etc.)
  *
@@ -197,15 +177,28 @@ export type CollectionSchema = {
 /**
  * Type definition for a collection
  * Wraps field definitions and validates no reserved names are used
+ * Generic over TVersioned to preserve literal true/false type for compile-time checks
  */
-export interface CollectionType<TFields extends CollectionSchema = CollectionSchema> {
+export interface CollectionType<
+    TFields extends CollectionSchema = CollectionSchema,
+    TVersioned extends boolean = boolean
+> {
     readonly _tag: 'CollectionType';
     readonly fields: TFields;
+    /**
+     * Whether to track versions for fields in this collection
+     * - true: Field-level LWW conflict resolution enabled
+     * - false (default): Simple overwrite, all versions are 0
+     */
+    readonly versioned: TVersioned;
 }
 
 /**
  * Define a collection type with field definitions
  * Validates that no reserved field names are used
+ *
+ * @param config.fields - Field definitions for the collection
+ * @param config.versioned - Whether to track field-level versions (default: false)
  *
  * @example
  * const schema = defineSchema({
@@ -213,18 +206,24 @@ export interface CollectionType<TFields extends CollectionSchema = CollectionSch
  *     fields: {
  *       title: mutable<string>(),
  *       completed: mutable<boolean>(),
- *     }
+ *     },
+ *     versioned: true  // Enable LWW conflict resolution
  *   })
  * });
  */
-export function type<TFields extends CollectionSchema>(
+export function type<
+    TFields extends CollectionSchema,
+    TVersioned extends boolean = false
+>(
     config: {
         fields: ValidateNoReservedFields<TFields>;
+        versioned?: TVersioned;
     }
-): CollectionType<TFields> {
+): CollectionType<TFields, TVersioned> {
     return {
         _tag: 'CollectionType',
         fields: config.fields as TFields,
+        versioned: (config.versioned ?? false) as TVersioned,
     };
 }
 
@@ -287,10 +286,15 @@ type ValidateReferences<TSchema extends SchemaDefinition> = {
 /**
  * Helper type to validate references in a full schema definition
  */
-type ValidateFullSchema<T extends FullSchemaDefinition> = {
-    types: ValidateReferences<T['types']> extends T['types'] ? T['types'] : ValidateReferences<T['types']>;
-    mutations: T['mutations'];
-};
+type ValidateFullSchema<T extends FullSchemaDefinition> =
+    T extends { types: infer TTypes; mutations: infer TMutations }
+        ? {
+            types: ValidateReferences<TTypes extends SchemaDefinition ? TTypes : never>;
+            mutations: TMutations;
+          }
+        : {
+            types: ValidateReferences<T['types']>;
+          };
 
 /**
  * Typed schema object returned by defineSchema
@@ -331,7 +335,7 @@ type Simplify<T> = { [K in keyof T]: T[K] };
 /**
  * Helper type to extract SchemaDefinition from Schema or use raw FullSchemaDefinition
  */
-type ExtractSchemaDefinition<T> = T extends Schema<infer S>
+export type ExtractSchemaDefinition<T> = T extends Schema<infer S>
     ? S['types']
     : T extends FullSchemaDefinition
         ? T['types']
@@ -362,8 +366,7 @@ type ExtractFields<T> = T extends CollectionType<infer TFields> ? TFields : neve
 
 /**
  * Helper to infer the value type for a field in Create/Update
- * - Mutable fields: plain value T
- * - Immutable fields: plain value T
+ * - Regular fields: plain value T
  * - Local fields: plain value T
  * - References (non-nullable): string
  * - References (nullable): string | null
@@ -383,8 +386,7 @@ type InferFieldValue<TField> =
  * Returns an object with:
  * - id: string (required - must specify the item ID)
  * - All user-defined fields EXCEPT local fields
- * - Mutable fields as plain values
- * - Immutable fields as plain values
+ * - Regular fields as plain values
  * - Reference fields as string (or string | null if nullable)
  * - Local fields are NOT included (they use default values)
  *
@@ -403,8 +405,8 @@ export type InferCreate<TSchema, TCollection extends keyof ExtractSchemaDefiniti
  *
  * Returns a partial object with:
  * - id: string (required - must specify which item to update)
- * - Only mutable and local fields (immutable fields and references cannot be updated)
- * - All mutable and local fields are optional
+ * - All fields (regular and local) are optional
+ * - References cannot be updated (they're immutable)
  * - Values are plain (not wrapped)
  *
  * @example
@@ -414,27 +416,45 @@ export type InferCreate<TSchema, TCollection extends keyof ExtractSchemaDefiniti
 export type InferUpdate<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
     id: string;
 } & {
-    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]> as ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]['fieldType'] extends 'mutable' | 'local' ? K : never]?:
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]> as ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]['fieldType'] extends 'field' | 'local' ? K : never]?:
+        InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
+}>;
+
+/**
+ * Infer the full Update input type for a collection
+ *
+ * Returns an object with:
+ * - id: string (required - must specify which item to update)
+ * - All fields (regular and local) are required
+ * - References cannot be updated (they're immutable)
+ * - Values are plain (not wrapped)
+ * - Useful for complete item replacement operations
+ *
+ * @example
+ * type UpdateFullTodo = InferUpdateFull<typeof schema, 'todos'>;
+ * // { id: string; title: string; completed: boolean; isSelected: boolean }
+ */
+export type InferUpdateFull<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
+    id: string;
+} & {
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]> as ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]['fieldType'] extends 'field' | 'local' ? K : never]:
         InferFieldValue<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
 }>;
 
 /**
  * Helper to infer the item representation for a field
- * - Mutable fields: { value: T, changedAt: number }
- * - Local fields: { value: T, changedAt: number }
- * - Immutable fields: plain value T
- * - References: string or string | null (no changedAt tracking)
+ * - Regular fields: { value: T, version: number }
+ * - Local fields: { value: T, version: number }
+ * - References: string or string | null (no version tracking)
  */
 type InferItemField<TField> =
     TField extends ReferenceFieldDescriptor<any, infer TNullable>
         ? TNullable extends true ? string | null : string
-        : TField extends MutableFieldDescriptor<infer T>
-            ? { value: T; changedAt: number }
+        : TField extends RegularFieldDescriptor<infer T>
+            ? { value: T; version: number }
             : TField extends LocalFieldDescriptor<infer T>
-                ? { value: T; changedAt: number }
-                : TField extends ImmutableFieldDescriptor<infer T>
-                    ? T
-                    : never;
+                ? { value: T; version: number }
+                : never;
 
 /**
  * Infer the in-memory Item type for a collection
@@ -442,7 +462,7 @@ type InferItemField<TField> =
  * Returns an object with:
  * - id: string (auto-added)
  * - createdAt: number (auto-added immutable)
- * - Mutable fields as { value: T, changedAt: number }
+ * - Mutable fields as { value: T, version: number }
  * - Immutable fields as plain values
  * - Reference fields as string (or string | null if nullable)
  *
@@ -451,8 +471,8 @@ type InferItemField<TField> =
  * // {
  * //   id: string;
  * //   createdAt: number;
- * //   title: { value: string; changedAt: number };
- * //   completed: { value: boolean; changedAt: number };
+ * //   title: { value: string; version: number };
+ * //   completed: { value: boolean; version: number };
  * //   priority: number;
  * //   assignedTo: string;
  * // }
@@ -470,13 +490,13 @@ export type InferItem<TSchema, TCollection extends keyof ExtractSchemaDefinition
  * Returns an object with:
  * - id: string (auto-added)
  * - createdAt: number (auto-added immutable)
- * - All fields as plain values (no { value, changedAt } wrapping)
+ * - All fields as plain values (no { value, version } wrapping)
  * - Mutable fields as plain values
  * - Immutable fields as plain values
  * - Reference fields as string (or string | null if nullable)
  *
  * This is useful for working with items in a simplified state where you don't need
- * to track individual field change timestamps.
+ * to track individual field versions.
  *
  * @example
  * type TodoState = InferItemState<typeof schema, 'todos'>;
@@ -497,8 +517,80 @@ export type InferItemState<TSchema, TCollection extends keyof ExtractSchemaDefin
 }>;
 
 /**
+ * Helper to infer the server-side representation for a field
+ * All fields (mutable, immutable, local, and references) are wrapped with FieldValue
+ * Only difference from client-side is that all fields have { value, version } structure
+ */
+type InferServerField<TField> =
+    TField extends ReferenceFieldDescriptor<any, infer TNullable>
+        ? TNullable extends true
+            ? FieldValue<string | null>
+            : FieldValue<string>
+        : TField extends FieldDescriptor<infer T>
+            ? FieldValue<T>
+            : never;
+
+/**
+ * Helper type to check if a collection has versioning enabled
+ */
+type HasVersionTracking<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> =
+    ExtractSchemaDefinition<TSchema>[TCollection] extends CollectionType<infer TFields>
+        ? ExtractSchemaDefinition<TSchema>[TCollection] extends { versioned: true }
+            ? true
+            : false
+        : false;
+
+/**
+ * Conditional version field - only present when versioned = true
+ */
+type ConditionalVersionField<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> =
+    HasVersionTracking<TSchema, TCollection> extends true
+        ? { version: Version }
+        : Record<string, never>;
+
+/**
+ * Infer the server-side item state type for a collection
+ *
+ * Returns an object with:
+ * - id: string (unwrapped - unique identifier)
+ * - version: number (only when versioned = true for the collection)
+ * - All other fields wrapped as { value: T, version: number }
+ * - Mutable fields: FieldValue<T>
+ * - Immutable fields: FieldValue<T>
+ * - Local fields: FieldValue<T>
+ * - Reference fields: FieldValue<string> or FieldValue<string | null>
+ *
+ * This is the internal server snapshot representation used for LWW conflict resolution.
+ *
+ * @example
+ * // With versioned = true
+ * type TodoServerState = InferServerItemState<typeof schema, 'todos'>;
+ * // {
+ * //   id: string;
+ * //   version: number;
+ * //   createdAt: FieldValue<number>;
+ * //   title: FieldValue<string>;
+ * //   completed: FieldValue<boolean>;
+ * // }
+ *
+ * // With versioned = false
+ * type SettingsServerState = InferServerItemState<typeof schema, 'settings'>;
+ * // {
+ * //   id: string;
+ * //   createdAt: FieldValue<number>;
+ * //   theme: FieldValue<string>;
+ * // }
+ */
+export type InferServerItemState<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> = Simplify<{
+    id: string;
+    createdAt: FieldValue<number>;
+} & ConditionalVersionField<TSchema, TCollection> & {
+    [K in keyof ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>]: InferServerField<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>[K]>;
+}>;
+
+/**
  * Helper type to extract all field values from a collection schema
- * - Mutable/Immutable fields: plain value T
+ * - Regular fields: plain value T
  * - References: string or string | null
  */
 type DenormalizedValues<TSchema extends CollectionSchema> = {
@@ -506,11 +598,11 @@ type DenormalizedValues<TSchema extends CollectionSchema> = {
 };
 
 /**
- * Helper type to extract changedAt fields for mutable and local fields
- * References and immutable fields don't have changedAt
+ * Helper type to extract version fields for regular and local fields
+ * References don't have version
  */
-type DenormalizedChangedAt<TSchema extends CollectionSchema> = {
-    [K in keyof TSchema & string as TSchema[K]['fieldType'] extends 'mutable' | 'local' ? `${K}ChangedAt` : never]: number;
+type DenormalizedVersion<TSchema extends CollectionSchema> = {
+    [K in keyof TSchema & string as TSchema[K]['fieldType'] extends 'field' | 'local' ? `${K}Version` : never]: number;
 };
 
 /**
@@ -519,7 +611,7 @@ type DenormalizedChangedAt<TSchema extends CollectionSchema> = {
  * Returns a flat object with:
  * - id: string (auto-added)
  * - createdAt: number (auto-added immutable)
- * - Mutable fields as two properties: field and fieldChangedAt
+ * - Mutable fields as two properties: field and fieldVersion
  * - Immutable fields as single property
  * - Reference fields as single property (string or string | null)
  *
@@ -529,9 +621,9 @@ type DenormalizedChangedAt<TSchema extends CollectionSchema> = {
  * //   id: string;
  * //   createdAt: number;
  * //   title: string;
- * //   titleChangedAt: number;
+ * //   titleVersion: number;
  * //   completed: boolean;
- * //   completedChangedAt: number;
+ * //   completedVersion: number;
  * //   priority: number;
  * //   assignedTo: string;
  * // }
@@ -541,7 +633,7 @@ export type InferDenormalized<TSchema, TCollection extends keyof ExtractSchemaDe
         id: string;
         createdAt: number;
     } & DenormalizedValues<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>>
-      & DenormalizedChangedAt<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>>
+      & DenormalizedVersion<ExtractFields<ExtractSchemaDefinition<TSchema>[TCollection]>>
 >;
 
 /**
@@ -619,40 +711,23 @@ export type InferMutations<TSchema> = keyof NonNullable<ExtractMutationDefinitio
 // ============================================================================
 
 /**
- * Helper to detect if a schema definition is in the old format (direct SchemaDefinition)
- * or new format (FullSchemaDefinition with types/mutations)
- */
-function isFullSchemaDefinition(schema: unknown): schema is FullSchemaDefinition {
-    return typeof schema === 'object' && schema !== null && 'types' in schema;
-}
-
-// Overload signatures
-export function defineSchema<T extends SchemaDefinition>(
-    schema: ValidateReferences<T> extends T ? T : ValidateReferences<T>
-): Schema<{ types: T; mutations?: undefined }>;
-export function defineSchema<T extends FullSchemaDefinition>(
-    schema: ValidateFullSchema<T> extends T ? T : ValidateFullSchema<T>
-): Schema<T>;
-
-/**
  * Define a schema for collections and mutations
  * Validates that all references point to collections that exist in the schema
  *
- * @param schema - Schema definition (SchemaDefinition or FullSchemaDefinition with types and optional mutations)
+ * @param schema - Schema definition with types and optional mutations
  * @returns Typed schema object with type inference utilities
  *
  * @example
- * // New format with types and mutations
  * const schema = defineSchema({
  *   types: {
  *     users: type({
  *       fields: {
- *         name: mutable<string>(),
+ *         name: field<string>(),
  *       }
  *     }),
  *     todos: type({
  *       fields: {
- *         title: mutable<string>(),
+ *         title: field<string>(),
  *         assignedTo: reference('users'), // Valid - 'users' exists
  *       }
  *     })
@@ -663,45 +738,32 @@ export function defineSchema<T extends FullSchemaDefinition>(
  *   }
  * });
  *
- * // Old format (backward compatible - automatically wrapped in types)
- * const legacySchema = defineSchema({
- *   users: type({
- *     fields: {
- *       name: mutable<string>(),
- *     }
- *   }),
- *   todos: type({
- *     fields: {
- *       title: mutable<string>(),
- *     }
- *   })
- * });
- *
  * // Use type inference
  * type CreateTodo = InferCreate<typeof schema, 'todos'>;
  * type UpdateTodo = InferUpdate<typeof schema, 'todos'>;
  * type Todo = InferItem<typeof schema, 'todos'>;
  * type TodoDenorm = InferDenormalized<typeof schema, 'todos'>;
  */
-export function defineSchema(schema: unknown): unknown {
-    // Normalize to FullSchemaDefinition format
-    const normalized: FullSchemaDefinition = isFullSchemaDefinition(schema)
-        ? schema
-        : { types: schema as SchemaDefinition };
+export function defineSchema<T extends FullSchemaDefinition>(
+    schema: ValidateFullSchema<T> extends T ? T : ValidateFullSchema<T>
+): Schema<T> {
+    const s = schema as T;
 
     return {
-        _schema: normalized,
-        collection(name: string): unknown {
-            return normalized.types[name]?.fields;
+        _schema: s,
+        collection<K extends keyof T['types']>(name: K) {
+            const types = s.types as Record<string, CollectionType>;
+            return types[name as string]?.fields;
         },
-        mutation(name: string): unknown {
-            if (!normalized.mutations) {
+        mutation<K extends keyof NonNullable<T['mutations']>>(name: K) {
+            if (!s.mutations) {
                 throw new Error(`Mutations are not defined in this schema`);
             }
-            return normalized.mutations[name];
+            const mutations = s.mutations as Record<string, unknown>;
+            return mutations[name as string];
         },
-        mutations(): string[] {
-            return normalized.mutations ? Object.keys(normalized.mutations) : [];
+        mutations() {
+            return s.mutations ? Object.keys(s.mutations) as (keyof T['mutations'])[] : [] as never;
         },
-    };
+    } as Schema<T>;
 }

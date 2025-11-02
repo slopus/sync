@@ -7,8 +7,7 @@ import { z } from 'zod';
 import {
     defineSchema,
     type,
-    mutableField,
-    immutableField,
+    field,
     reference,
     sync,
     type SyncEngine,
@@ -23,8 +22,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -50,7 +49,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -79,8 +78,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            isExpanded: mutableField<boolean>(),
+                            title: field<string>(),
+                            isExpanded: field<boolean>(),
                         },
                     }),
                 },
@@ -129,8 +128,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -187,7 +186,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            isExpanded: mutableField<boolean>(),
+                            isExpanded: field<boolean>(),
                         },
                     }),
                 },
@@ -229,8 +228,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            isExpanded: mutableField<boolean>(),
+                            title: field<string>(),
+                            isExpanded: field<boolean>(),
                         },
                     }),
                 },
@@ -289,7 +288,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -331,7 +330,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -377,7 +376,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -423,7 +422,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -461,8 +460,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -533,8 +532,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            priority: mutableField<number>(),
+                            title: field<string>(),
+                            priority: field<number>(),
                         },
                     }),
                 },
@@ -578,8 +577,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -613,8 +612,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -655,8 +654,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -711,8 +710,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -753,8 +752,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -781,8 +780,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -811,8 +810,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            description: mutableField<string | null>(),
+                            title: field<string>(),
+                            description: field<string | null>(),
                         },
                     }),
                 },
@@ -849,8 +848,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -900,8 +899,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -959,8 +958,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -1041,7 +1040,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -1078,7 +1077,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -1131,8 +1130,8 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
-                            completed: mutableField<boolean>(),
+                            title: field<string>(),
+                            completed: field<boolean>(),
                         },
                     }),
                 },
@@ -1189,7 +1188,7 @@ describe('Sync Engine', () => {
                 types: {
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                         },
                     }),
                 },
@@ -1231,12 +1230,12 @@ describe('Sync Engine', () => {
                 types: {
                     users: type({
                         fields: {
-                            name: mutableField<string>(),
+                            name: field<string>(),
                         },
                     }),
                     todos: type({
                         fields: {
-                            title: mutableField<string>(),
+                            title: field<string>(),
                             assignedTo: reference('users'),
                         },
                     }),

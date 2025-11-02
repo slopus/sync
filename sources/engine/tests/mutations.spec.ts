@@ -7,7 +7,7 @@ import { z } from 'zod';
 import {
     defineSchema,
     type,
-    mutableField,
+    field,
     type InferMutationInput,
     type InferMutationOutput,
     type InferMutations,
@@ -19,8 +19,8 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
-                        completed: mutableField<boolean>(),
+                        title: field<string>(),
+                        completed: field<boolean>(),
                     },
                 }),
             },
@@ -49,7 +49,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -71,7 +71,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -94,7 +94,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -105,17 +105,18 @@ describe('Schema Mutations', () => {
         );
     });
 
-    it('should work with old schema format (backward compatibility)', () => {
+    it('should work with schemas without mutations', () => {
         const schema = defineSchema({
-            todos: type({
-                fields: {
-                    title: mutableField<string>(),
-                },
-            }),
+            types: {
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            },
         });
 
         expect(schema._schema.types.todos).toBeDefined();
-        expect(schema._schema.mutations).toBeUndefined();
 
         const mutationNames = schema.mutations();
         expect(mutationNames).toHaveLength(0);
@@ -126,7 +127,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -151,7 +152,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -176,7 +177,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -197,7 +198,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -241,7 +242,7 @@ describe('Schema Mutations', () => {
             types: {
                 todos: type({
                     fields: {
-                        title: mutableField<string>(),
+                        title: field<string>(),
                     },
                 }),
             },
@@ -252,11 +253,13 @@ describe('Schema Mutations', () => {
 
         // Schema without mutations (old format)
         const withoutMutations = defineSchema({
-            todos: type({
-                fields: {
-                    title: mutableField<string>(),
-                },
-            }),
+            types: {
+                todos: type({
+                    fields: {
+                        title: field<string>(),
+                    },
+                }),
+            },
         });
 
         expect(withMutations._schema.mutations).toBeDefined();

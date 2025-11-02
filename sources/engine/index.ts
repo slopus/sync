@@ -6,22 +6,22 @@
 export type {
     ItemId,
     Timestamp,
-    OperationId
+    OperationId,
+    FieldValue,
+    Version
 } from './types';
 
 // Schema DSL
 export {
     defineSchema,
     type,
-    mutable as mutableField,
-    immutable as immutableField,
+    field,
     local as localField,
     reference,
 } from './schema';
 export type {
     FieldType,
-    MutableFieldDescriptor,
-    ImmutableFieldDescriptor,
+    RegularFieldDescriptor,
     LocalFieldDescriptor,
     ReferenceFieldDescriptor,
     FieldDescriptor,
@@ -33,8 +33,10 @@ export type {
     Schema,
     InferCreate,
     InferUpdate,
+    InferUpdateFull,
     InferItem,
     InferItemState,
+    InferServerItemState,
     InferDenormalized,
     InferCollections,
     InferMutationInput,
@@ -44,4 +46,4 @@ export type {
 
 // Sync Engine
 export { sync } from './sync';
-export type { SyncState, SyncEngine, PartialServerUpdate, PendingMutation } from './sync';
+export type { SyncState, ServerSnapshot, SyncEngine, PartialServerUpdate, PendingMutation } from './sync';

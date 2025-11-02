@@ -1,13 +1,35 @@
-import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, Schema } from "./schema";
+import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ExtractSchemaDefinition } from "./schema";
 import { produce } from 'immer';
 import { createId } from '@paralleldrive/cuid2';
+import { FieldValue, Version } from "./types";
 
 /**
- * State type for the sync engine
+ * Helper type to check if a collection has versioning enabled
+ */
+type HasVersionTracking<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> =
+    ExtractSchemaDefinition<TSchema>[TCollection] extends CollectionType<infer TFields>
+        ? ExtractSchemaDefinition<TSchema>[TCollection] extends { versioned: true }
+            ? true
+            : false
+        : false;
+
+/**
+ * State type for the sync engine (client-side representation)
  * Maps collection names to records of items indexed by ID
+ * All fields are unwrapped (plain values)
  */
 export type SyncState<T extends FullSchemaDefinition> = {
     [K in keyof T['types']]: Record<string, InferItemState<Schema<T>, K>>
+};
+
+/**
+ * Server snapshot type (server-side internal representation)
+ * Contains wrapped field values with versions for LWW conflict resolution
+ * Version tracking is per-object, not global
+ */
+export type ServerSnapshot<T extends FullSchemaDefinition> = {
+    /** Collections containing server item states (wrapped fields with per-object versions) */
+    [K in keyof T['types']]: Record<string, InferServerItemState<Schema<T>, K>>
 };
 
 /**
@@ -88,13 +110,23 @@ type MutatorRegistry<T extends FullSchemaDefinition> = {
 };
 
 /**
+ * Helper type to create a partial server update item
+ * Ensures version is required when versioned=true, prohibited when versioned=false
+ */
+type PartialServerItem<T extends FullSchemaDefinition, TCollection extends keyof T['types']> =
+    HasVersionTracking<Schema<T>, TCollection> extends true
+        // When versioned=true: version is required
+        ? { id: string; version: number } & Partial<Omit<InferItemState<Schema<T>, TCollection>, 'id'>>
+        // When versioned=false: version is prohibited
+        : { id: string; version?: never } & Partial<Omit<InferItemState<Schema<T>, TCollection>, 'id'>>;
+
+/**
  * Partial server update - collections contain arrays of partial items
  * Each item must have an id, but other fields are optional
+ * Version is REQUIRED when versioned=true, PROHIBITED when versioned=false (compile-time checked)
  */
 export type PartialServerUpdate<T extends FullSchemaDefinition> = {
-    [K in keyof T['types']]?: Array<
-        Partial<InferItemState<Schema<T>, K>> & { id: string }
-    >
+    [K in keyof T['types']]?: Array<PartialServerItem<T, K>>
 };
 
 /**
@@ -178,7 +210,7 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
  */
 export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEngine<T> {
 
-    // Create empty initial state
+    // Create empty initial state (client representation)
     const createEmptyState = (): SyncState<T> => {
         const emptyState = {} as SyncState<T>;
         for (let collection of Object.keys(schema._schema.types)) {
@@ -187,17 +219,65 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
         return emptyState;
     };
 
+    // Create empty initial server snapshot (server representation)
+    const createEmptySnapshot = (): ServerSnapshot<T> => {
+        const emptySnapshot = {} as ServerSnapshot<T>;
+        for (let collection of Object.keys(schema._schema.types)) {
+            (emptySnapshot as Record<string, Record<string, unknown>>)[collection] = {};
+        }
+        return emptySnapshot;
+    };
+
     // Internal state
-    let serverState: SyncState<T> = createEmptyState();
+    let serverSnapshot: ServerSnapshot<T> = createEmptySnapshot();
     let state: SyncState<T> = createEmptyState();
     // All mutations (both pending and local) in order
     const allPendingMutations: PendingMutation<T>[] = [];
     const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;
 
     /**
-     * Rebase state by applying ALL mutations (including local) to server state
+     * Unwrap server snapshot to client state
+     * Converts FieldValue<T> to plain T for all fields except id and version
+     */
+    const unwrapSnapshot = (snapshot: ServerSnapshot<T>): SyncState<T> => {
+        const clientState = {} as SyncState<T>;
+
+        for (const collectionName in snapshot) {
+            const collectionKey = collectionName as keyof T['types'];
+            const serverItems = snapshot[collectionKey];
+            const clientItems: Record<string, unknown> = {};
+
+            for (const itemId in serverItems) {
+                const serverItem = serverItems[itemId] as Record<string, unknown>;
+                const clientItem: Record<string, unknown> = {
+                    id: serverItem.id, // id is not wrapped
+                };
+
+                // Unwrap all other fields (skip id and version)
+                for (const fieldName in serverItem) {
+                    if (fieldName === 'id' || fieldName === 'version') continue; // Skip unwrapped fields
+
+                    const fieldValue = serverItem[fieldName] as FieldValue<unknown>;
+                    clientItem[fieldName] = fieldValue.value;
+                }
+
+                clientItems[itemId] = clientItem;
+            }
+
+            clientState[collectionKey] = clientItems as Record<string, InferItemState<Schema<T>, typeof collectionKey>>;
+        }
+
+        return clientState;
+    };
+
+    /**
+     * Rebase state by applying ALL mutations (including local) to unwrapped server state
      */
     const rebaseState = (): void => {
+        // Start with unwrapped server snapshot
+        const baseState = unwrapSnapshot(serverSnapshot);
+
+        // Apply all mutations on top
         state = allPendingMutations.reduce(
             (currentState, mutation) => {
                 const mutator = mutators[mutation.name];
@@ -209,7 +289,7 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
                     mutator(draft as SyncState<T>, mutation.input);
                 }) as SyncState<T>;
             },
-            serverState
+            baseState
         );
     };
 
@@ -219,7 +299,8 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
         },
 
         get serverState() {
-            return serverState;
+            // Return unwrapped server snapshot as client state
+            return unwrapSnapshot(serverSnapshot);
         },
 
         get pendingMutations() {
@@ -318,60 +399,121 @@ export function sync<T extends FullSchemaDefinition>(schema: Schema<T>): SyncEng
                 return true;
             };
 
-            // Helper to initialize local fields with default values
-            const initializeLocalFields = (item: Record<string, unknown>, collectionName: string): void => {
-                const collectionFields = schema.collection(collectionName as keyof T['types']);
-                if (!collectionFields) return;
-
-                for (const fieldName in collectionFields) {
-                    const field = collectionFields[fieldName];
-                    if (field.fieldType === 'local') {
-                        // Initialize local field with default value
-                        item[fieldName] = field.defaultValue;
-                    }
-                }
-            };
-
-            // Merge partial server update into current server state
-            serverState = produce(serverState, draft => {
-                const draftState = draft as SyncState<T>;
-
+            // Merge partial server update into server snapshot with per-object versioning and field-level LWW
+            serverSnapshot = produce(serverSnapshot, draft => {
                 for (const collectionName in partialServerUpdate) {
                     const collectionKey = collectionName as keyof T['types'];
                     const partialItems = partialServerUpdate[collectionKey];
                     if (!partialItems) continue;
 
-                    const collection = draftState[collectionKey];
+                    // TypeScript struggles with generic indexing in Immer drafts
+                    const collection = (draft as Record<string, Record<string, unknown>>)[collectionName];
                     const collectionFields = schema.collection(collectionKey);
+                    const collectionType = (schema._schema.types as Record<string, CollectionType>)[collectionName];
+                    const versioned = collectionType.versioned;
 
                     for (const partialItem of partialItems) {
                         const itemId = partialItem.id;
-                        const existingItem = collection[itemId];
+                        const existingItem = collection[itemId] as Record<string, unknown> | undefined;
+
+                        // Get incoming version (if provided and tracking enabled)
+                        const incomingVersion = versioned && 'version' in partialItem
+                            ? (partialItem as Record<string, unknown>).version as number
+                            : 0;
 
                         if (existingItem) {
-                            // Item exists: patch/merge fields (but SKIP local fields)
-                            for (const key in partialItem) {
-                                const field = collectionFields?.[key];
+                            // Item exists: merge fields using LWW if enabled
+                            for (const fieldName in partialItem) {
+                                if (fieldName === 'id' || fieldName === 'version') continue; // Skip id and version
+
+                                const field = collectionFields?.[fieldName];
                                 // Skip local fields - they're client-side only
                                 if (field?.fieldType === 'local') continue;
-                                // Update all other fields
-                                (existingItem as Record<string, unknown>)[key] = (partialItem as Record<string, unknown>)[key];
+
+                                const incomingValue = (partialItem as Record<string, unknown>)[fieldName];
+
+                                // For fields, use incoming version (object version)
+                                const fieldVersion = incomingVersion;
+
+                                // Regular field - wrap it
+                                const existingField = existingItem[fieldName] as FieldValue<unknown> | undefined;
+
+                                if (existingField && versioned && fieldVersion > 0) {
+                                    // LWW: compare versions, keep most recent
+                                    if (fieldVersion > existingField.version) {
+                                        existingItem[fieldName] = {
+                                            value: incomingValue,
+                                            version: fieldVersion,
+                                        };
+                                    }
+                                } else {
+                                    // No existing field or no tracking - just set it
+                                    existingItem[fieldName] = {
+                                        value: incomingValue,
+                                        version: fieldVersion,
+                                    };
+                                }
+                            }
+
+                            // Update object version if tracking enabled and new version provided
+                            if (versioned && incomingVersion > 0) {
+                                const currentVersion = existingItem.version as number || 0;
+                                if (incomingVersion > currentVersion) {
+                                    existingItem.version = incomingVersion;
+                                }
                             }
                         } else {
-                            // Item doesn't exist: only create if complete
+                            // Item doesn't exist: create if complete
                             if (isComplete(partialItem as Record<string, unknown>, collectionName)) {
-                                // Initialize local fields with defaults
-                                initializeLocalFields(partialItem as Record<string, unknown>, collectionName);
-                                // Create the item
-                                (collection as Record<string, unknown>)[itemId] = partialItem;
+                                const newItem: Record<string, unknown> = {
+                                    id: itemId, // id is not wrapped
+                                };
+
+                                // Add version field if versioning enabled
+                                if (versioned) {
+                                    newItem.version = incomingVersion;
+                                }
+
+                                // Wrap all fields (except id and version)
+                                for (const fieldName in partialItem) {
+                                    if (fieldName === 'id' || fieldName === 'version') continue;
+
+                                    const field = collectionFields?.[fieldName];
+                                    if (field?.fieldType === 'local') {
+                                        // Initialize local field with default value (wrapped)
+                                        newItem[fieldName] = {
+                                            value: field.defaultValue,
+                                            version: 0, // Local fields always have version = 0
+                                        };
+                                    } else {
+                                        // Wrap regular field with object version
+                                        newItem[fieldName] = {
+                                            value: (partialItem as Record<string, unknown>)[fieldName],
+                                            version: incomingVersion,
+                                        };
+                                    }
+                                }
+
+                                // Add local fields that weren't in the partial item
+                                for (const fieldName in collectionFields) {
+                                    const field = collectionFields[fieldName];
+                                    if (field.fieldType === 'local' && !(fieldName in partialItem)) {
+                                        newItem[fieldName] = {
+                                            value: field.defaultValue,
+                                            version: 0,
+                                        };
+                                    }
+                                }
+
+                                (collection as Record<string, unknown>)[itemId] = newItem;
                             }
                             // Otherwise ignore incomplete items
                         }
                     }
                 }
-            }) as SyncState<T>;
+            }) as ServerSnapshot<T>;
 
-            // Rebase state with new server state
+            // Rebase client state with new server snapshot
             rebaseState();
         },
     };
