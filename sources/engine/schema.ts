@@ -438,11 +438,32 @@ export type InferCollections<TSchema> = keyof ExtractSchemaDefinition<TSchema>;
 /**
  * Helper type to extract CollectionSchema fields from a collection or object type
  */
-type ExtractFields<T> = T extends CollectionType<infer TFields>
+export type ExtractFields<T> = T extends CollectionType<infer TFields>
     ? TFields
     : T extends ObjectType<infer TFields>
         ? TFields
         : never;
+
+/**
+ * Filter fields to only include server fields (field + reference, excludes local)
+ */
+export type ServerFieldsOnly<TFields extends CollectionSchema> = {
+    [K in keyof TFields as TFields[K]['fieldType'] extends 'field' | 'reference' ? K : never]: TFields[K];
+};
+
+/**
+ * Filter fields to only include local fields (fieldType === 'local')
+ */
+export type LocalFieldsOnly<TFields extends CollectionSchema> = {
+    [K in keyof TFields as TFields[K]['fieldType'] extends 'local' ? K : never]: TFields[K];
+};
+
+/**
+ * Filter fields to include server, local, and reference fields (all fields)
+ */
+export type ServerAndLocalFields<TFields extends CollectionSchema> = {
+    [K in keyof TFields as TFields[K]['fieldType'] extends 'field' | 'local' | 'reference' ? K : never]: TFields[K];
+};
 
 /**
  * Helper to infer the value type for a field in Create/Update
@@ -451,7 +472,7 @@ type ExtractFields<T> = T extends CollectionType<infer TFields>
  * - References (non-nullable): string
  * - References (nullable): string | null
  */
-type InferFieldValue<TField> =
+export type InferFieldValue<TField> =
     TField extends ReferenceFieldDescriptor<any, infer TNullable>
         ? TNullable extends true ? string | null : string
         : TField extends LocalFieldDescriptor<infer T>
@@ -619,7 +640,7 @@ type HasVersionTracking<TSchema, TCollection extends keyof ExtractSchemaDefiniti
  */
 type ConditionalVersionField<TSchema, TCollection extends keyof ExtractSchemaDefinition<TSchema>> =
     HasVersionTracking<TSchema, TCollection> extends true
-        ? { version: Version }
+        ? { $version: Version }
         : Record<string, never>;
 
 /**

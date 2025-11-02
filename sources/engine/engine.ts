@@ -1,4 +1,4 @@
-import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ObjectType, ExtractSchemaDefinition, InferObjectState, InferServerObjectState } from "./schema";
+import { FullSchemaDefinition, InferItemState, InferMutationInput, InferMutations, InferServerItemState, Schema, CollectionType, ObjectType, ExtractSchemaDefinition, InferObjectState, InferServerObjectState, CollectionSchema, InferFieldValue, ServerFieldsOnly, LocalFieldsOnly, ServerAndLocalFields, ExtractFields } from "./schema";
 import { produce } from 'immer';
 import { createId } from '@paralleldrive/cuid2';
 import { FieldValue } from "./types";
@@ -115,37 +115,121 @@ type MutatorRegistry<T extends FullSchemaDefinition> = {
 };
 
 /**
- * Helper type to create a partial server update item for collections
- * Ensures version is required when versioned=true, prohibited when versioned=false
+ * Generate partial update fields - all fields optional
  */
-type PartialServerItem<T extends FullSchemaDefinition, TCollection extends keyof T['types']> =
+type PartialUpdateFields<TFields extends CollectionSchema> = {
+    [K in keyof TFields]?: InferFieldValue<TFields[K]>;
+};
+
+/**
+ * Generate full update fields - all fields required
+ */
+type FullUpdateFields<TFields extends CollectionSchema> = {
+    [K in keyof TFields]: InferFieldValue<TFields[K]>;
+};
+
+/**
+ * Partial update for a collection item
+ */
+type PartialUpdateItem<T extends FullSchemaDefinition, TCollection extends keyof T['types'], TFields extends CollectionSchema> =
     HasVersionTracking<Schema<T>, TCollection> extends true
-        // When versioned=true: version is required
-        ? { id: string; version: number } & Partial<Omit<InferItemState<Schema<T>, TCollection>, 'id'>>
-        // When versioned=false: version is prohibited
-        : { id: string; version?: never } & Partial<Omit<InferItemState<Schema<T>, TCollection>, 'id'>>;
+        ? { id: string; $version: number } & PartialUpdateFields<TFields>
+        : { id: string; $version?: never } & PartialUpdateFields<TFields>;
 
 /**
- * Helper type to create a partial server update for singleton objects
- * No id field, version required when versioned=true
+ * Full update for a collection item
  */
-type PartialServerObject<T extends FullSchemaDefinition, TObject extends keyof T['types']> =
-    HasVersionTracking<Schema<T>, TObject> extends true
-        // When versioned=true: version is required
-        ? { version: number } & Partial<InferObjectState<Schema<T>, TObject>>
-        // When versioned=false: version is prohibited
-        : { version?: never } & Partial<InferObjectState<Schema<T>, TObject>>;
+type FullUpdateItem<T extends FullSchemaDefinition, TCollection extends keyof T['types'], TFields extends CollectionSchema> =
+    HasVersionTracking<Schema<T>, TCollection> extends true
+        ? { id: string; $version: number } & FullUpdateFields<TFields>
+        : { id: string; $version?: never } & FullUpdateFields<TFields>;
 
 /**
- * Partial server update
- * - Collections: arrays of partial items (each with id)
- * - Singleton objects: single object (no id, direct fields)
- * Version is REQUIRED when versioned=true, PROHIBITED when versioned=false (compile-time checked)
+ * Partial update for a singleton object
+ */
+type PartialUpdateObject<T extends FullSchemaDefinition, TObject extends keyof T['types'], TFields extends CollectionSchema> =
+    HasVersionTracking<Schema<T>, TObject> extends true
+        ? { $version: number } & PartialUpdateFields<TFields>
+        : { $version?: never } & PartialUpdateFields<TFields>;
+
+/**
+ * Full update for a singleton object
+ */
+type FullUpdateObject<T extends FullSchemaDefinition, TObject extends keyof T['types'], TFields extends CollectionSchema> =
+    HasVersionTracking<Schema<T>, TObject> extends true
+        ? { $version: number } & FullUpdateFields<TFields>
+        : { $version?: never } & FullUpdateFields<TFields>;
+
+/**
+ * Partial update with mixed fields (server + local)
+ * - Collections: arrays of partial items
+ * - Singletons: single object
+ * - Fields: All fields (server + local) are optional
+ */
+export type PartialUpdate<T extends FullSchemaDefinition> = {
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType<infer TFields>
+        ? PartialUpdateObject<T, K, ServerAndLocalFields<TFields>>
+        : Array<PartialUpdateItem<T, K, ServerAndLocalFields<ExtractFields<T['types'][K]>>>>
+};
+
+/**
+ * Partial update with server fields only
+ * - Collections: arrays of partial items
+ * - Singletons: single object
+ * - Fields: Only server fields (excludes local fields)
  */
 export type PartialServerUpdate<T extends FullSchemaDefinition> = {
-    [K in keyof T['types']]?: T['types'][K] extends ObjectType
-        ? PartialServerObject<T, K>  // Single object for singletons
-        : Array<PartialServerItem<T, K>>  // Array for collections
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType<infer TFields>
+        ? PartialUpdateObject<T, K, ServerFieldsOnly<TFields>>
+        : Array<PartialUpdateItem<T, K, ServerFieldsOnly<ExtractFields<T['types'][K]>>>>
+};
+
+/**
+ * Partial update with local fields only
+ * - Collections: arrays of partial items
+ * - Singletons: single object
+ * - Fields: Only local fields (excludes server fields)
+ */
+export type PartialLocalUpdate<T extends FullSchemaDefinition> = {
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType<infer TFields>
+        ? PartialUpdateObject<T, K, LocalFieldsOnly<TFields>>
+        : Array<PartialUpdateItem<T, K, LocalFieldsOnly<ExtractFields<T['types'][K]>>>>
+};
+
+/**
+ * Full update with mixed fields (server + local)
+ * - Collections: arrays of complete items
+ * - Singletons: single complete object
+ * - Fields: All fields (server + local) are required
+ */
+export type FullUpdate<T extends FullSchemaDefinition> = {
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType<infer TFields>
+        ? FullUpdateObject<T, K, ServerAndLocalFields<TFields>>
+        : Array<FullUpdateItem<T, K, ServerAndLocalFields<ExtractFields<T['types'][K]>>>>
+};
+
+/**
+ * Full update with server fields only
+ * - Collections: arrays of complete items
+ * - Singletons: single complete object
+ * - Fields: Only server fields are required (excludes local fields)
+ */
+export type FullServerUpdate<T extends FullSchemaDefinition> = {
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType<infer TFields>
+        ? FullUpdateObject<T, K, ServerFieldsOnly<TFields>>
+        : Array<FullUpdateItem<T, K, ServerFieldsOnly<ExtractFields<T['types'][K]>>>>
+};
+
+/**
+ * Full update with local fields only
+ * - Collections: arrays of complete items
+ * - Singletons: single complete object
+ * - Fields: Only local fields are required (excludes server fields)
+ */
+export type FullLocalUpdate<T extends FullSchemaDefinition> = {
+    [K in keyof T['types']]?: T['types'][K] extends ObjectType<infer TFields>
+        ? FullUpdateObject<T, K, LocalFieldsOnly<TFields>>
+        : Array<FullUpdateItem<T, K, LocalFieldsOnly<ExtractFields<T['types'][K]>>>>
 };
 
 /**
@@ -226,13 +310,13 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
      * - If item is new but missing required fields: ignores it
      * - Automatically rebases pending mutations after update (unless direct=true)
      *
-     * @param partialServerUpdate - Partial data to merge into server snapshot
+     * @param partialUpdate - Partial data to merge into server snapshot (can include server and/or local fields)
      * @param options - Optional rebase configuration
      * @param options.allowServerFields - Allow updating regular fields (default: true)
      * @param options.allowLocalFields - Allow updating local fields (default: false)
      * @param options.direct - Skip full state rebase (default: false)
      */
-    rebase(partialServerUpdate: PartialServerUpdate<T>, options?: RebaseOptions): void;
+    rebase(partialUpdate: PartialUpdate<T>, options?: RebaseOptions): void;
 }
 
 /**
@@ -302,7 +386,7 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
 
                 // Unwrap all fields (skip version)
                 for (const fieldName in serverObject) {
-                    if (fieldName === 'version') continue; // Skip version field
+                    if (fieldName === '$version') continue; // Skip version field
 
                     const fieldValue = serverObject[fieldName] as FieldValue<unknown>;
                     clientObject[fieldName] = fieldValue.value;
@@ -322,7 +406,7 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
 
                     // Unwrap all other fields (skip id and version)
                     for (const fieldName in serverItem) {
-                        if (fieldName === 'id' || fieldName === 'version') continue; // Skip unwrapped fields
+                        if (fieldName === 'id' || fieldName === '$version') continue; // Skip unwrapped fields
 
                         const fieldValue = serverItem[fieldName] as FieldValue<unknown>;
                         clientItem[fieldName] = fieldValue.value;
@@ -407,8 +491,8 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                     const partialObject = partialData as Record<string, unknown>;
                     const singletonObject = (draft as Record<string, Record<string, unknown>>)[name];
 
-                    const incomingVersion = versioned && 'version' in partialObject
-                        ? partialObject.version as number
+                    const incomingVersion = versioned && '$version' in partialObject
+                        ? partialObject.$version as number
                         : 0;
 
                     const exists = Object.keys(singletonObject).length > 0;
@@ -416,7 +500,7 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                     if (exists) {
                         // Patch existing singleton
                         for (const fieldName in partialObject) {
-                            if (fieldName === 'version') continue;
+                            if (fieldName === '$version') continue;
 
                             const field = typeFields?.[fieldName];
                             const isLocal = field?.fieldType === 'local';
@@ -450,19 +534,19 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                         }
 
                         if (wrapped && versioned && incomingVersion > 0) {
-                            const currentVersion = singletonObject.version as number || 0;
+                            const currentVersion = singletonObject.$version as number || 0;
                             if (incomingVersion > currentVersion) {
-                                singletonObject.version = incomingVersion;
+                                singletonObject.$version = incomingVersion;
                             }
                         }
                     } else {
                         // Create new singleton
                         if (versioned) {
-                            singletonObject.version = incomingVersion;
+                            singletonObject.$version = incomingVersion;
                         }
 
                         for (const fieldName in partialObject) {
-                            if (fieldName === 'version') continue;
+                            if (fieldName === '$version') continue;
 
                             const field = typeFields?.[fieldName];
                             const isLocal = field?.fieldType === 'local';
@@ -507,14 +591,14 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                         const itemId = partialItem.id as string;
                         const existingItem = collection[itemId] as Record<string, unknown> | undefined;
 
-                        const incomingVersion = versioned && 'version' in partialItem
-                            ? partialItem.version as number
+                        const incomingVersion = versioned && '$version' in partialItem
+                            ? partialItem.$version as number
                             : 0;
 
                         if (existingItem) {
                             // Patch existing item
                             for (const fieldName in partialItem) {
-                                if (fieldName === 'id' || fieldName === 'version') continue;
+                                if (fieldName === 'id' || fieldName === '$version') continue;
 
                                 const field = typeFields?.[fieldName];
                                 const isLocal = field?.fieldType === 'local';
@@ -548,9 +632,9 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                             }
 
                             if (wrapped && versioned && incomingVersion > 0) {
-                                const currentVersion = existingItem.version as number || 0;
+                                const currentVersion = existingItem.$version as number || 0;
                                 if (incomingVersion > currentVersion) {
-                                    existingItem.version = incomingVersion;
+                                    existingItem.$version = incomingVersion;
                                 }
                             }
                         } else if (isComplete(partialItem, name)) {
@@ -560,11 +644,11 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                             };
 
                             if (versioned) {
-                                newItem.version = incomingVersion;
+                                newItem.$version = incomingVersion;
                             }
 
                             for (const fieldName in partialItem) {
-                                if (fieldName === 'id' || fieldName === 'version') continue;
+                                if (fieldName === 'id' || fieldName === '$version') continue;
 
                                 const field = typeFields?.[fieldName];
                                 const isLocal = field?.fieldType === 'local';
@@ -665,7 +749,7 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
             }
         },
 
-        rebase(partialServerUpdate, options) {
+        rebase(partialUpdate, options) {
             // Destructure options with defaults
             const {
                 allowServerFields = true,
@@ -676,7 +760,7 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
             // Update server snapshot (wrapped values with LWW)
             serverSnapshot = applyPartialUpdate(
                 serverSnapshot,
-                partialServerUpdate,
+                partialUpdate,
                 true,  // wrapped
                 allowServerFields,
                 allowLocalFields
@@ -690,7 +774,7 @@ export function syncEngine<T extends FullSchemaDefinition>(schema: Schema<T>): S
                 // Direct mode: patch client state directly (plain values, no mutation reapplication)
                 state = applyPartialUpdate(
                     state,
-                    partialServerUpdate,
+                    partialUpdate,
                     false, // unwrapped (plain values)
                     allowServerFields,
                     allowLocalFields

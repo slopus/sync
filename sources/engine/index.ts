@@ -50,4 +50,16 @@ export type {
 
 // Sync Engine
 export { syncEngine } from './engine';
-export type { SyncState, ServerSnapshot, SyncEngine, PartialServerUpdate, PendingMutation, RebaseOptions } from './engine';
+export type {
+    SyncState,
+    ServerSnapshot,
+    SyncEngine,
+    PartialServerUpdate,
+    PartialUpdate,
+    PartialLocalUpdate,
+    FullServerUpdate,
+    FullUpdate,
+    FullLocalUpdate,
+    PendingMutation,
+    RebaseOptions
+} from './engine';

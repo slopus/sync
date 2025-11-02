@@ -116,7 +116,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Old Title',
                     completed: false,
                 }],
@@ -130,7 +130,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 2,
+                    $version: 2,
                     title: 'New Title',
                 }],
             });
@@ -161,7 +161,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 3,
+                    $version: 3,
                     title: 'Newest Title',
                     completed: true,
                 }],
@@ -175,7 +175,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Old Title',
                     completed: false,
                 }],
@@ -207,7 +207,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Original Title',
                     completed: false,
                 }],
@@ -218,7 +218,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 2,
+                    $version: 2,
                     title: 'Updated Title',
                 }],
             });
@@ -228,7 +228,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 3,
+                    $version: 3,
                     completed: true,
                 }],
             });
@@ -243,7 +243,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Stale Title',
                 }],
             });
@@ -281,7 +281,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 users: [{
                     id: 'user-1',
-                    version: 1,
+                    $version: 1,
                     name: 'Alice',
                 }],
             });
@@ -291,7 +291,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 2,
+                    $version: 2,
                     title: 'Test Todo',
                     assignedTo: 'user-1',
                 }],
@@ -304,7 +304,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     assignedTo: 'user-2',
                 }],
             });
@@ -334,7 +334,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Test',
                     completed: false,
                 }],
@@ -378,7 +378,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Server Title',
                     completed: false,
                 }],
@@ -419,7 +419,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Test',
                     // isExpanded not provided by server
                 }],
@@ -452,7 +452,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 1,
+                    $version: 1,
                     title: 'Test',
                 }],
             });
@@ -465,7 +465,7 @@ describe('Dual-Representation Architecture', () => {
             engine.rebase({
                 todos: [{
                     id: 'todo-1',
-                    version: 2,
+                    $version: 2,
                     title: 'Updated Title',
                     isExpanded: true, // This should be ignored
                 }],

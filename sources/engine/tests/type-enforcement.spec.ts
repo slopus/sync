@@ -25,7 +25,7 @@ describe('Type Enforcement', () => {
         type TodoItem = NonNullable<UpdateType['todos']>[number];
 
         // Type-level test: version should be required
-        type VersionField = TodoItem extends { version: infer V } ? V : never;
+        type VersionField = TodoItem extends { $version: infer V } ? V : never;
         type IsVersionRequired = undefined extends VersionField ? false : true;
 
         // This compile-time assertion will fail if version is not required
@@ -62,7 +62,7 @@ describe('Type Enforcement', () => {
             settings: [{
                 id: 'settings-1',
                 // @ts-expect-error - version is prohibited when versioned is omitted
-                version: 1,
+                $version: 1,
                 theme: 'dark',
             }],
         };

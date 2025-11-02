@@ -144,7 +144,7 @@ describe('Singleton Objects', () => {
             vi.setSystemTime(1000);
             engine.rebase({
                 settings: {
-                    version: 1,
+                    $version: 1,
                     theme: 'light',
                     fontSize: 12,
                 },
@@ -157,7 +157,7 @@ describe('Singleton Objects', () => {
             vi.setSystemTime(2000);
             engine.rebase({
                 settings: {
-                    version: 2,
+                    $version: 2,
                     theme: 'dark',
                 },
             });
@@ -186,7 +186,7 @@ describe('Singleton Objects', () => {
             vi.setSystemTime(3000);
             engine.rebase({
                 settings: {
-                    version: 3,
+                    $version: 3,
                     theme: 'dark',
                 },
             });
@@ -197,7 +197,7 @@ describe('Singleton Objects', () => {
             vi.setSystemTime(1000);
             engine.rebase({
                 settings: {
-                    version: 1,
+                    $version: 1,
                     theme: 'light',
                 },
             });
