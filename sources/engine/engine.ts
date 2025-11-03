@@ -299,6 +299,12 @@ export interface SyncEngine<T extends FullSchemaDefinition> {
     readonly pendingMutations: ReadonlyArray<PendingMutation<T>>;
 
     /**
+     * Callback invoked whenever the engine state changes
+     * Set this to track state updates from mutations, commits, and rebases
+     */
+    onStateChange: ((state: SyncState<T>) => void) | undefined;
+
+    /**
      * Apply a mutation locally
      * Creates a mutation ID and timestamp, adds to pending list, and rebases state
      * This mutation will be sent to the server
@@ -515,6 +521,7 @@ export function syncEngine<T extends FullSchemaDefinition>(
     let state: SyncState<T>;
     const pendingMutations: PendingMutation<T>[] = [];
     const mutators: MutatorRegistry<T> = {} as MutatorRegistry<T>;
+    let stateChangeCallback: ((state: SyncState<T>) => void) | undefined;
 
     // Auto-register mutation handlers from schema
     if (schema._schema.mutations) {
@@ -547,6 +554,15 @@ export function syncEngine<T extends FullSchemaDefinition>(
     }
 
     /**
+     * Notify state change callback if registered
+     */
+    const notifyStateChange = (): void => {
+        if (stateChangeCallback) {
+            stateChangeCallback(state);
+        }
+    };
+
+    /**
      * Rebase state by applying all pending mutations to unwrapped server state
      */
     const rebaseState = (): void => {
@@ -566,6 +582,9 @@ export function syncEngine<T extends FullSchemaDefinition>(
             },
             baseState
         );
+
+        // Notify state change
+        notifyStateChange();
     };
 
     // If restoring with pending mutations, rebase now
@@ -835,6 +854,14 @@ export function syncEngine<T extends FullSchemaDefinition>(
             return pendingMutations as ReadonlyArray<PendingMutation<T>>;
         },
 
+        get onStateChange() {
+            return stateChangeCallback;
+        },
+
+        set onStateChange(callback: ((state: SyncState<T>) => void) | undefined) {
+            stateChangeCallback = callback;
+        },
+
         mutate(name, input, options) {
             // Get the mutator handler
             const mutator = mutators[name];
@@ -850,6 +877,9 @@ export function syncEngine<T extends FullSchemaDefinition>(
                 state = produce(state, draft => {
                     mutator(draft as SyncState<T>, input);
                 }) as SyncState<T>;
+
+                // Notify state change
+                notifyStateChange();
             } else {
                 // Normal mode: add to pending queue and rebase
                 // Create mutation metadata
@@ -863,7 +893,7 @@ export function syncEngine<T extends FullSchemaDefinition>(
                 // Add to mutations list
                 pendingMutations.push(mutation);
 
-                // Rebase state
+                // Rebase state (which will call notifyStateChange)
                 rebaseState();
             }
         },
@@ -910,6 +940,7 @@ export function syncEngine<T extends FullSchemaDefinition>(
             // Update client state based on mode
             if (!direct) {
                 // Normal mode: full rebase (unwrap + reapply mutations)
+                // This will call notifyStateChange
                 rebaseState();
             } else {
                 // Direct mode: patch client state directly (plain values, no mutation reapplication)
@@ -920,6 +951,9 @@ export function syncEngine<T extends FullSchemaDefinition>(
                     allowServerFields,
                     allowLocalFields
                 );
+
+                // Notify state change
+                notifyStateChange();
             }
         },
 
